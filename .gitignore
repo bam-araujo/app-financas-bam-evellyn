@@ -1,0 +1,30 @@
+# Dependências
+node_modules/
+
+# Build
+frontend/dist/
+frontend/.vite/
+
+# Envs locais — NUNCA commitar
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Logs e caches
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# clasp (deploy Apps Script via CLI, opcional)
+.clasprc.json
+backend/.clasp.json
+backend/_bootstrap.js
+
+# Token temporário de setup — NUNCA commitar
+.token-temp
