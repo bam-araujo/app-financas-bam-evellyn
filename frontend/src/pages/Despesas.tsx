@@ -554,8 +554,19 @@ export function DespesasPage({ competencia, filters, me }: Props) {
                 min={2}
                 max={60}
                 inputMode="numeric"
-                value={form.parcelas}
-                onChange={(e) => setForm({ ...form, parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) })}
+                value={form.parcelas || ''}
+                onChange={(e) => {
+                  // Permite campo vazio/transient durante edição.
+                  // Validator no submit garante >= 2. Só clampa o teto aqui.
+                  const raw = e.target.value
+                  if (raw === '') { setForm({ ...form, parcelas: 0 }); return }
+                  const n = Number(raw)
+                  if (!isFinite(n) || n < 0) return
+                  setForm({ ...form, parcelas: Math.min(60, n) })
+                }}
+                onBlur={() => {
+                  if (!form.parcelas || form.parcelas < 2) setForm({ ...form, parcelas: 2 })
+                }}
               />
             </label>
           )}
