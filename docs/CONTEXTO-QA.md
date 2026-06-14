@@ -100,7 +100,7 @@ node smoke-share.mjs         # só share/acerto
 node smoke-serie.mjs         # só séries (parcelado/recorrente)
 ```
 
-Variáveis: `VITE_API_URL` + `VITE_API_TOKEN` no `.env` do front; mesmas vars como `API_URL` + `API_TOKEN` no env do shell pros scripts `.mjs`.
+Variáveis: `VITE_API_URL` + `VITE_GOOGLE_CLIENT_ID` no `.env` do front (auth via OAuth Google). Scripts `.mjs` usam `VITE_API_URL` + `API_TOKEN` (sem prefixo VITE_ pra nunca entrar no bundle) e mandam `service_token` no body.
 
 ## Regras inegociáveis (de [AGENTS.md](../AGENTS.md))
 

@@ -38,7 +38,7 @@ Por que assim: sem servidor próprio, sem free tier que pausa por inatividade, s
 - Scaffold PWA (Vite + React + TS), `manifest.json` + service worker, instalável.
 - Estrutura: `/frontend`, `/backend` (Apps Script), `/docs`.
 - `backend/Code.gs`: roteamento por `?action=`, validação de token, helpers de leitura/escrita da planilha, endpoint `ping` → `{ok:true, ts}`.
-- Config no front: `VITE_API_URL` e `VITE_API_TOKEN` (build-time) + `.env.example`.
+- Config no front: `VITE_API_URL` e `VITE_GOOGLE_CLIENT_ID` (build-time) + `.env.example`. *(Pós-migração OAuth — backlog histórico mencionava `VITE_API_TOKEN` que foi removido.)*
 - GitHub Action: build do front + deploy no GitHub Pages no push para `main`.
 - `docs/SETUP.md` com os passos manuais do Google.
 

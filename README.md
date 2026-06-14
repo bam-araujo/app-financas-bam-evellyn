@@ -10,7 +10,7 @@ PWA de controle financeiro do casal. **Custo zero**: Google Sheets (banco) + Goo
 
 ```
 frontend/   # PWA React + Vite + TS
-backend/    # Google Apps Script (Code.gs)
+backend/    # Google Apps Script (módulos 00_Config..08_Auth)
 docs/       # SETUP.md e afins
 ```
 
@@ -18,7 +18,7 @@ docs/       # SETUP.md e afins
 
 ```bash
 cd frontend
-cp .env.example .env.local   # preencher VITE_API_URL e VITE_API_TOKEN
+cp .env.example .env.local   # preencher VITE_API_URL e VITE_GOOGLE_CLIENT_ID
 npm install
 npm run dev
 ```
