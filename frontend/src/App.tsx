@@ -9,6 +9,7 @@ import { AcertoPage } from './pages/Acerto'
 import { DashboardPage } from './pages/Dashboard'
 import { DespesasPage } from './pages/Despesas'
 import { ImportarPage } from './pages/Importar'
+import { InvestimentosPage } from './pages/Investimentos'
 import { ReceitasPage } from './pages/Receitas'
 
 type ConnStatus =
@@ -17,17 +18,18 @@ type ConnStatus =
   | { kind: 'error'; message: string }
 
 const TABS = [
+  { key: 'home', label: 'Home' },
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
   { key: 'acerto', label: 'Acerto' },
-  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'investimentos', label: 'Investimentos' },
 ]
 
 export default function App() {
   const [conn, setConn] = useState<ConnStatus>({ kind: 'loading' })
   const [competencia, setCompetencia] = useState<string>(currentCompetencia())
   const [filters, setFilters] = useState<GlobalFilters>(DEFAULT_FILTERS)
-  const [route, navigate] = useHashRoute('despesas')
+  const [route, navigate] = useHashRoute('home')
 
   useEffect(() => {
     ping()
@@ -51,12 +53,13 @@ export default function App() {
         {conn.kind === 'error' && (
           <p className="error-msg">Sem conexão com a API: {conn.message}</p>
         )}
+        {(route === 'home' || route === 'dashboard') && <DashboardPage competencia={competencia} filters={filters} />}
         {route === 'despesas' && <DespesasPage competencia={competencia} filters={filters} />}
         {route === 'receitas' && <ReceitasPage competencia={competencia} filters={filters} />}
         {route === 'acerto' && <AcertoPage competencia={competencia} />}
-        {route === 'dashboard' && <DashboardPage competencia={competencia} filters={filters} />}
+        {route === 'investimentos' && <InvestimentosPage filters={filters} />}
         {route === 'importar' && <ImportarPage />}
-        {!['despesas', 'receitas', 'acerto', 'dashboard', 'importar'].includes(route) && (
+        {!['home', 'dashboard', 'despesas', 'receitas', 'acerto', 'investimentos', 'importar'].includes(route) && (
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
