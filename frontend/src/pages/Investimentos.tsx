@@ -45,6 +45,119 @@ type FormMov = typeof EMPTY_MOV
 const COLOR_CONJUNTO = '#10b981'
 const colorPara = (t: Titular): string => t === 'Bam' ? COLOR_BAM : t === 'Evellyn' ? COLOR_EVELLYN : COLOR_CONJUNTO
 
+// --- Sub-componentes dos forms (extraídos pra poder render no topo) ---
+
+interface FormSaldoCompProps {
+  form: FormSaldo
+  setForm: (f: FormSaldo) => void
+  saving: boolean
+  formError: string | null
+  onSubmit: (e: React.FormEvent) => void
+  onCancel: () => void
+}
+function FormSaldoComponent({ form, setForm, saving, formError, onSubmit, onCancel }: FormSaldoCompProps) {
+  return (
+    <form className="card form" onSubmit={onSubmit}>
+      <h3>{form.id ? 'Editar saldo' : 'Novo snapshot de saldo'}</h3>
+      <label>
+        <span>Data</span>
+        <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
+      </label>
+      <label>
+        <span>Titular</span>
+        <div className="seg-group">
+          {TITULARES_OPTIONS.map((t) => (
+            <button key={t} type="button"
+              className={'seg' + (form.titular === t ? ' seg-active' : '')}
+              onClick={() => setForm({ ...form, titular: t })}
+            >{t}</button>
+          ))}
+        </div>
+      </label>
+      <label>
+        <span>Instituição</span>
+        <input type="text" value={form.instituicao} placeholder="Itaú, NuInvest, XP, ..."
+          onChange={(e) => setForm({ ...form, instituicao: e.target.value })} />
+      </label>
+      <label>
+        <span>Ativo</span>
+        <input type="text" value={form.ativo} placeholder="Tesouro Selic 2029, CDB, FII XYZ, ..."
+          onChange={(e) => setForm({ ...form, ativo: e.target.value })} />
+      </label>
+      <label>
+        <span>Valor do saldo nessa data</span>
+        <input type="text" inputMode="decimal" placeholder="0,00" value={form.valor}
+          onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+      </label>
+      {formError && <p className="error-msg">{formError}</p>}
+      <div className="form-actions">
+        <button type="button" className="btn" onClick={onCancel} disabled={saving}>Cancelar</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+      </div>
+    </form>
+  )
+}
+
+interface FormMovCompProps {
+  form: FormMov
+  setForm: (f: FormMov) => void
+  saving: boolean
+  formError: string | null
+  onSubmit: (e: React.FormEvent) => void
+  onCancel: () => void
+}
+function FormMovComponent({ form, setForm, saving, formError, onSubmit, onCancel }: FormMovCompProps) {
+  return (
+    <form className="card form" onSubmit={onSubmit}>
+      <h3>{form.id ? 'Editar movimento' : 'Novo aporte/resgate'}</h3>
+      <label>
+        <span>Data</span>
+        <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
+      </label>
+      <label>
+        <span>Titular</span>
+        <div className="seg-group">
+          {TITULARES_OPTIONS.map((t) => (
+            <button key={t} type="button"
+              className={'seg' + (form.titular === t ? ' seg-active' : '')}
+              onClick={() => setForm({ ...form, titular: t })}
+            >{t}</button>
+          ))}
+        </div>
+      </label>
+      <label>
+        <span>Tipo</span>
+        <div className="seg-group">
+          <button type="button" className={'seg' + (form.tipo === 'aporte' ? ' seg-active' : '')}
+            onClick={() => setForm({ ...form, tipo: 'aporte' })}>Aporte</button>
+          <button type="button" className={'seg' + (form.tipo === 'resgate' ? ' seg-active' : '')}
+            onClick={() => setForm({ ...form, tipo: 'resgate' })}>Resgate</button>
+        </div>
+      </label>
+      <label>
+        <span>Instituição</span>
+        <input type="text" value={form.instituicao}
+          onChange={(e) => setForm({ ...form, instituicao: e.target.value })} />
+      </label>
+      <label>
+        <span>Ativo</span>
+        <input type="text" value={form.ativo}
+          onChange={(e) => setForm({ ...form, ativo: e.target.value })} />
+      </label>
+      <label>
+        <span>Valor</span>
+        <input type="text" inputMode="decimal" placeholder="0,00" value={form.valor}
+          onChange={(e) => setForm({ ...form, valor: e.target.value })} />
+      </label>
+      {formError && <p className="error-msg">{formError}</p>}
+      <div className="form-actions">
+        <button type="button" className="btn" onClick={onCancel} disabled={saving}>Cancelar</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+      </div>
+    </form>
+  )
+}
+
 export function InvestimentosPage({ filters }: Props) {
   const [saldos, setSaldos] = useState<InvestimentoSaldoRow[]>([])
   const [movs, setMovs] = useState<InvestimentoMovimentoRow[]>([])
@@ -267,6 +380,24 @@ export function InvestimentosPage({ filters }: Props) {
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}
 
+      {/* Forms (logo abaixo dos botões pra não perder contexto) */}
+      {formSaldoOpen && (
+        <FormSaldoComponent
+          form={formSaldo} setForm={setFormSaldo}
+          saving={saving} formError={formError}
+          onSubmit={saveSaldo}
+          onCancel={() => setFormSaldoOpen(false)}
+        />
+      )}
+      {formMovOpen && (
+        <FormMovComponent
+          form={formMov} setForm={setFormMov}
+          saving={saving} formError={formError}
+          onSubmit={saveMov}
+          onCancel={() => setFormMovOpen(false)}
+        />
+      )}
+
       {/* Insights */}
       <div className="card resumo" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>
@@ -298,99 +429,6 @@ export function InvestimentosPage({ filters }: Props) {
           rendimento = saldo_final − saldo_inicial − aportes + resgates (rentabilidade é aproximação, não TIR)
         </p>
       </div>
-
-      {/* Form saldo */}
-      {formSaldoOpen && (
-        <form className="card form" onSubmit={saveSaldo}>
-          <h3>{formSaldo.id ? 'Editar saldo' : 'Novo snapshot de saldo'}</h3>
-          <label>
-            <span>Data</span>
-            <input type="date" value={formSaldo.data} onChange={(e) => setFormSaldo({ ...formSaldo, data: e.target.value })} />
-          </label>
-          <label>
-            <span>Titular</span>
-            <div className="seg-group">
-              {TITULARES_OPTIONS.map((t) => (
-                <button key={t} type="button"
-                  className={'seg' + (formSaldo.titular === t ? ' seg-active' : '')}
-                  onClick={() => setFormSaldo({ ...formSaldo, titular: t })}
-                >{t}</button>
-              ))}
-            </div>
-          </label>
-          <label>
-            <span>Instituição</span>
-            <input type="text" value={formSaldo.instituicao} placeholder="Itaú, NuInvest, XP, ..."
-              onChange={(e) => setFormSaldo({ ...formSaldo, instituicao: e.target.value })} />
-          </label>
-          <label>
-            <span>Ativo</span>
-            <input type="text" value={formSaldo.ativo} placeholder="Tesouro Selic 2029, CDB, FII XYZ, ..."
-              onChange={(e) => setFormSaldo({ ...formSaldo, ativo: e.target.value })} />
-          </label>
-          <label>
-            <span>Valor do saldo nessa data</span>
-            <input type="text" inputMode="decimal" placeholder="0,00" value={formSaldo.valor}
-              onChange={(e) => setFormSaldo({ ...formSaldo, valor: e.target.value })} />
-          </label>
-          {formError && <p className="error-msg">{formError}</p>}
-          <div className="form-actions">
-            <button type="button" className="btn" onClick={() => setFormSaldoOpen(false)} disabled={saving}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
-          </div>
-        </form>
-      )}
-
-      {/* Form movimento */}
-      {formMovOpen && (
-        <form className="card form" onSubmit={saveMov}>
-          <h3>{formMov.id ? 'Editar movimento' : 'Novo aporte/resgate'}</h3>
-          <label>
-            <span>Data</span>
-            <input type="date" value={formMov.data} onChange={(e) => setFormMov({ ...formMov, data: e.target.value })} />
-          </label>
-          <label>
-            <span>Titular</span>
-            <div className="seg-group">
-              {TITULARES_OPTIONS.map((t) => (
-                <button key={t} type="button"
-                  className={'seg' + (formMov.titular === t ? ' seg-active' : '')}
-                  onClick={() => setFormMov({ ...formMov, titular: t })}
-                >{t}</button>
-              ))}
-            </div>
-          </label>
-          <label>
-            <span>Tipo</span>
-            <div className="seg-group">
-              <button type="button" className={'seg' + (formMov.tipo === 'aporte' ? ' seg-active' : '')}
-                onClick={() => setFormMov({ ...formMov, tipo: 'aporte' })}>Aporte</button>
-              <button type="button" className={'seg' + (formMov.tipo === 'resgate' ? ' seg-active' : '')}
-                onClick={() => setFormMov({ ...formMov, tipo: 'resgate' })}>Resgate</button>
-            </div>
-          </label>
-          <label>
-            <span>Instituição</span>
-            <input type="text" value={formMov.instituicao}
-              onChange={(e) => setFormMov({ ...formMov, instituicao: e.target.value })} />
-          </label>
-          <label>
-            <span>Ativo</span>
-            <input type="text" value={formMov.ativo}
-              onChange={(e) => setFormMov({ ...formMov, ativo: e.target.value })} />
-          </label>
-          <label>
-            <span>Valor</span>
-            <input type="text" inputMode="decimal" placeholder="0,00" value={formMov.valor}
-              onChange={(e) => setFormMov({ ...formMov, valor: e.target.value })} />
-          </label>
-          {formError && <p className="error-msg">{formError}</p>}
-          <div className="form-actions">
-            <button type="button" className="btn" onClick={() => setFormMovOpen(false)} disabled={saving}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
-          </div>
-        </form>
-      )}
 
       {/* Evolução */}
       {evolucao.data.length > 1 && (
