@@ -3,12 +3,12 @@
  *
  * Convenções:
  * - Content-Type: text/plain (evita preflight CORS — Apps Script não configura CORS).
- * - Token vai no corpo (POST) ou query (GET).
+ * - Auth: id_token (JWT do Google) vai no body/query em cada request. O backend
+ *   valida assinatura via tokeninfo + checa email contra allowlist em /pessoas.
  * - Resposta: {ok:true, data} | {ok:false, error}.
- *
- * PR2: CRUD genérico tipado por tabela + helpers por entidade.
  */
 
+import { currentIdToken } from '../hooks/useAuth'
 import type {
   CreatePayload,
   TableMap,
@@ -17,7 +17,6 @@ import type {
 } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined
-const API_TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -30,13 +29,21 @@ class TransientApiError extends Error {
   constructor(msg: string) { super(msg); this.name = 'TransientApiError' }
 }
 
-function assertConfigured(): { url: string; token: string } {
-  if (!API_URL || !API_TOKEN) {
+function assertConfigured(): { url: string } {
+  if (!API_URL) {
     throw new Error(
-      'API não configurada. Defina VITE_API_URL e VITE_API_TOKEN (.env.local local; Secrets do GitHub no deploy).',
+      'API não configurada. Defina VITE_API_URL (.env.local local; Secrets do GitHub no deploy).',
     )
   }
-  return { url: API_URL, token: API_TOKEN }
+  return { url: API_URL }
+}
+
+/** Auth: o ping não exige token; tudo o mais sim. */
+function authParams(action: string): Record<string, string> {
+  if (action === 'ping') return {}
+  const token = currentIdToken()
+  if (!token) throw new Error('not_signed_in')
+  return { id_token: token }
 }
 
 /**
@@ -66,8 +73,8 @@ async function fetchTransient(input: string, init?: RequestInit): Promise<Respon
 
 /** GET de baixo nível — usado por list/get. */
 async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
-  const { url, token } = assertConfigured()
-  const qs = new URLSearchParams({ action, token, ...params })
+  const { url } = assertConfigured()
+  const qs = new URLSearchParams({ action, ...authParams(action), ...params })
   return withRetry(async () => {
     const res = await fetchTransient(`${url}?${qs.toString()}`, { method: 'GET' })
     return unwrap<T>(res)
@@ -76,12 +83,12 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
 
 /** POST de baixo nível — usado por create/update/delete. */
 async function apiPost<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
-  const { url, token } = assertConfigured()
+  const { url } = assertConfigured()
   return withRetry(async () => {
     const res = await fetchTransient(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, token, ...body }),
+      body: JSON.stringify({ action, ...authParams(action), ...body }),
     })
     return unwrap<T>(res)
   })
@@ -107,6 +114,20 @@ async function unwrap<T>(res: Response): Promise<T> {
 export type PingData = { ts: number }
 export function ping(): Promise<PingData> {
   return apiGet<PingData>('ping')
+}
+
+// ====== whoami ===============================================================
+
+export interface WhoamiData {
+  email: string
+  nome: 'Bam' | 'Evellyn'
+  cor: string
+  name: string
+  picture: string
+  source: 'oauth' | 'service'
+}
+export function whoami(): Promise<WhoamiData> {
+  return apiGet<WhoamiData>('whoami')
 }
 
 // ====== CRUD genérico ========================================================

@@ -101,6 +101,75 @@ main {
 }
 .theme-toggle:hover { color: var(--accent); background: var(--row-hover); }
 .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.signout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.signout-btn:hover { color: var(--accent); background: var(--row-hover); }
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--fg);
+  background: var(--bg-card);
+}
+.user-avatar {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.user-nome { font-weight: 600; }
+.greeting {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+/* ========== Login gate =============================================== */
+
+.login-gate {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.login-card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--bg-card);
+  text-align: center;
+}
+.brand-login {
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.brand-login h1 { font-size: 2rem !important; }
+.brand-login .tagline { font-size: 0.75rem; }
+.login-card p { margin: 0.5rem 0; line-height: 1.5; }
+.login-button-slot {
+  margin: 1.25rem 0 0.25rem;
+  display: flex;
+  justify-content: center;
+}
 .app-header h1 {
   margin: 0;
   font-size: 1.125rem;

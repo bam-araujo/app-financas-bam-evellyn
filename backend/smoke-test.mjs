@@ -1,23 +1,23 @@
 // Smoke test do CRUD via fetch (Node 18+/20+/24).
-// Rodar: VITE_API_URL=... VITE_API_TOKEN=... node smoke-test.mjs
+// Rodar: VITE_API_URL=... API_TOKEN=... node smoke-test.mjs
 
 const URL = process.env.VITE_API_URL
-const TOKEN = process.env.VITE_API_TOKEN
+const TOKEN = process.env.API_TOKEN
 if (!URL || !TOKEN) {
-  console.error('faltou VITE_API_URL ou VITE_API_TOKEN no env')
+  console.error('faltou VITE_API_URL ou API_TOKEN no env')
   process.exit(2)
 }
 
 async function call(method, action, body = {}, query = {}) {
   if (method === 'GET') {
-    const qs = new URLSearchParams({ action, token: TOKEN, ...query })
+    const qs = new URLSearchParams({ action, service_token: TOKEN, ...query })
     const res = await fetch(`${URL}?${qs}`)
     return res.json()
   } else {
     const res = await fetch(URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, token: TOKEN, ...body }),
+      body: JSON.stringify({ action, service_token: TOKEN, ...body }),
     })
     return res.json()
   }

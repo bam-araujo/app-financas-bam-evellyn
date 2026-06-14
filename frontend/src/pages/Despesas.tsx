@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos } from '../api/client'
+import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos, type WhoamiData } from '../api/client'
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
 import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
@@ -12,6 +12,7 @@ import { lancamentoWeight } from '../lib/rateio'
 interface Props {
   competencia: string
   filters: GlobalFilters
+  me: WhoamiData | null
 }
 
 type Repeticao = 'unico' | 'parcelado' | 'recorrente'
@@ -35,7 +36,7 @@ const EMPTY_FORM = {
 }
 type FormState = typeof EMPTY_FORM
 
-export function DespesasPage({ competencia, filters }: Props) {
+export function DespesasPage({ competencia, filters, me }: Props) {
   const [rows, setRows] = useState<LancamentoRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +70,9 @@ export function DespesasPage({ competencia, filters }: Props) {
   }, [competencia])
 
   const crud = useCrudForm<FormState>({
-    emptyForm: () => ({ ...EMPTY_FORM, data: todayISO() }),
+    // Prefill: data = hoje; pagador = usuário logado (cobre o caso comum
+    // "eu tô lançando uma compra que eu mesmo paguei").
+    emptyForm: () => ({ ...EMPTY_FORM, data: todayISO(), pagador: (me?.nome || '') as '' | Pessoa }),
     validate: (form) => {
       if (!form.data) return 'data obrigatória'
       if (!form.descricao.trim()) return 'descrição obrigatória'

@@ -1,10 +1,13 @@
 // QA end-to-end via API. Cobre todos os PRs.
 // Convenção: dados de teste prefixados com "QA_" pra cleanup confiável.
-// Rodar: VITE_API_URL=... VITE_API_TOKEN=... node qa-e2e.mjs
+// Rodar: VITE_API_URL=... API_TOKEN=... node qa-e2e.mjs
+//
+// API_TOKEN é o service_token (Script Property no Apps Script). Não usa
+// o prefixo VITE_ pra deixar claro que NUNCA deve entrar em build do frontend.
 
 const API = process.env.VITE_API_URL
-const T = process.env.VITE_API_TOKEN
-if (!API || !T) { console.error('faltou VITE_API_URL ou VITE_API_TOKEN'); process.exit(2) }
+const T = process.env.API_TOKEN
+if (!API || !T) { console.error('faltou VITE_API_URL ou API_TOKEN'); process.exit(2) }
 
 const TAG = 'QA_'
 
@@ -12,13 +15,13 @@ const TAG = 'QA_'
 async function post(action, body) {
   const r = await fetch(API, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action, token: T, ...body }),
+    body: JSON.stringify({ action, service_token: T, ...body }),
   })
   return r.json()
 }
 async function get(action, qs = {}) {
   const u = new URL(API)
-  u.searchParams.set('action', action); u.searchParams.set('token', T)
+  u.searchParams.set('action', action); u.searchParams.set('service_token', T)
   for (const k in qs) u.searchParams.set(k, qs[k])
   return (await fetch(u)).json()
 }

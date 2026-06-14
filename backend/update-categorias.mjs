@@ -1,6 +1,6 @@
 // Aplica diff de categorias na planilha viva.
 const API = process.env.VITE_API_URL
-const T = process.env.VITE_API_TOKEN
+const T = process.env.API_TOKEN
 
 const REMOVE = ['Aluguel', 'Água', 'Condomínio', 'Roupas']
 const ADD = [
@@ -10,21 +10,21 @@ const ADD = [
 ]
 
 async function listAll() {
-  const r = await fetch(`${API}?action=list&table=categorias&token=${T}`)
+  const r = await fetch(`${API}?action=list&table=categorias&service_token=${T}`)
   return (await r.json()).data
 }
 async function del(id) {
   return fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'delete', token: T, table: 'categorias', id }),
+    body: JSON.stringify({ action: 'delete', service_token: T, table: 'categorias', id }),
   }).then((r) => r.json())
 }
 async function add(data) {
   return fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'create', token: T, table: 'categorias', data }),
+    body: JSON.stringify({ action: 'create', service_token: T, table: 'categorias', data }),
   }).then((r) => r.json())
 }
 

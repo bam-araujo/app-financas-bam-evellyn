@@ -51,12 +51,15 @@ Backend (Apps Script):
 - Moeda e datas sempre em pt-BR (`Intl.NumberFormat('pt-BR')`, datas pt-BR).
 - Gráficos: **Recharts** (gratuito). Não usar libs de chart comerciais.
 - Toda tela com estados de loading / erro / vazio.
-- Variáveis de ambiente: `VITE_API_URL`, `VITE_API_TOKEN` (build-time).
+- Variáveis de ambiente do frontend (build-time, ficam no bundle público — não usar pra segredos):
+  - `VITE_API_URL` — URL do Web App do Apps Script.
+  - `VITE_GOOGLE_CLIENT_ID` — Client ID do OAuth (público por design).
+- Scripts `.mjs` em `backend/` usam `API_TOKEN` (sem prefixo VITE_ pra evitar que vaze no bundle) + `VITE_API_URL`, e mandam `service_token` no body.
 
 ## Contrato da API (resumo — detalhe no PR2)
 
 - Formato de resposta: sucesso `{ok:true, data}`; erro `{ok:false, error}`.
-- Auth: token validado em toda requisição. Sem token → 401.
+- Auth: id_token (JWT Google) validado em toda requisição via tokeninfo + checagem contra coluna `email` da aba `pessoas` (allowlist). Scripts locais usam `service_token` (Script Property). Sem credencial → `unauthorized`.
 - Router genérico por `action` + `table` (list/get/create/update/delete).
 
 ## Armadilhas do Apps Script (respeitar sempre)

@@ -37,7 +37,9 @@ jobs:
           # GitHub Pages de projeto serve em /<repo>/. Derivamos do nome do repo.
           BASE_PATH: /${{ github.event.repository.name }}/
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_API_TOKEN: ${{ secrets.VITE_API_TOKEN }}
+          # client_id é público por design (entra no bundle). Mesmo assim
+          # passamos via Secret pra não hardcodar e permitir rotação fácil.
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build
 
       - name: Upload artifact

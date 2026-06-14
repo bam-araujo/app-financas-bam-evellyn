@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { investimentosMovimentos, investimentosSaldos } from '../api/client'
+import { investimentosMovimentos, investimentosSaldos, type WhoamiData } from '../api/client'
 import type { InvestimentoMovimentoRow, InvestimentoSaldoRow, Titular } from '../api/types'
 import { EvolucaoPatrimonio } from '../components/charts/EvolucaoPatrimonio'
 import type { GlobalFilters } from '../components/Filters'
@@ -11,6 +11,7 @@ import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 
 interface Props {
   filters: GlobalFilters
+  me: WhoamiData | null
 }
 
 const TITULARES_OPTIONS: Titular[] = ['Bam', 'Evellyn', 'conjunto']
@@ -35,7 +36,7 @@ const EMPTY_MOV = {
 type FormSaldo = typeof EMPTY_SALDO
 type FormMov = typeof EMPTY_MOV
 
-export function InvestimentosPage({ filters }: Props) {
+export function InvestimentosPage({ filters, me }: Props) {
   const [saldos, setSaldos] = useState<InvestimentoSaldoRow[]>([])
   const [movs, setMovs] = useState<InvestimentoMovimentoRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -69,7 +70,11 @@ export function InvestimentosPage({ filters }: Props) {
 
   const { patrimonioAtual, analise, evolucao } = useInvestimentoInsights(saldosF, movsF, inicioAnalise, fimAnalise)
 
-  const presetTitular: Titular = filters.pessoa === 'casal' ? 'Bam' : (filters.pessoa as Titular)
+  // Preset do titular: filtro tem precedência (faz sentido pro user que tá olhando
+  // a visão de uma pessoa). Senão, usa o usuário logado. Fallback: 'Bam'.
+  const presetTitular: Titular = filters.pessoa === 'casal'
+    ? ((me?.nome as Titular) || 'Bam')
+    : (filters.pessoa as Titular)
 
   const saldoForm = useCrudForm<FormSaldo>({
     emptyForm: () => ({ ...EMPTY_SALDO, data: todayISO(), titular: presetTitular }),

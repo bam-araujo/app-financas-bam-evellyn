@@ -79,11 +79,14 @@ const V = {
 
 const SCHEMA = {
   pessoas: {
-    columns: ['id', 'nome', 'cor'],
+    // email = Gmail do usuário, usado pelo backend pra allowlist do OAuth.
+    // Preencher manualmente na planilha após initSchema. Sem email = sem acesso.
+    columns: ['id', 'nome', 'cor', 'email'],
     required: ['nome'],
     validators: {
       nome: V.enum(PESSOAS_VALIDAS),
       cor: V.stringRequired,
+      email: V.stringOptional,
     },
   },
   categorias: {

@@ -17,15 +17,30 @@ function handle_(e, fromPost) {
     var action = String(params.action || '').trim();
 
     if (!action) return reply_({ ok: false, error: 'missing_action' });
-    if (!params.token || params.token !== getAuthToken_()) {
-      return reply_({ ok: false, error: 'unauthorized' });
+
+    // ping não exige auth — usado pra checar conectividade antes do login.
+    if (action === 'ping') {
+      return reply_({ ok: true, data: { ts: Date.now() } });
     }
+
+    // Auth obrigatória pra todo o resto. user fica disponível pras actions
+    // (whoami devolve direto, outras só usam pra audit/personalização futura).
+    var user;
+    try { user = verifyAndIdentify_(params); }
+    catch (err) { return reply_({ ok: false, error: String(err && err.message || 'unauthorized') }); }
+
+    if (action === 'whoami') {
+      return reply_({ ok: true, data: {
+        email: user.email, nome: user.nome, cor: user.cor,
+        name: user.name, picture: user.picture, source: user.source,
+      } });
+    }
+
     if (!PUBLIC_ACTIONS.has(action)) {
       return reply_({ ok: false, error: 'unknown_action:' + action });
     }
 
     switch (action) {
-      case 'ping':         return reply_({ ok: true, data: { ts: Date.now() } });
       case 'list':         return reply_({ ok: true, data: list_(params) });
       case 'get':          return reply_({ ok: true, data: get_(params) });
       case 'create':       return reply_({ ok: true, data: withLock_(function () { return create_(params); }) });

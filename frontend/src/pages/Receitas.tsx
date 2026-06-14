@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { receitas } from '../api/client'
+import { receitas, type WhoamiData } from '../api/client'
 import type { Pessoa, ReceitaRow } from '../api/types'
 import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
@@ -9,6 +9,7 @@ import { formatBRL, formatCompetenciaBR, parseBRL } from '../lib/format'
 interface Props {
   competencia: string
   filters: GlobalFilters
+  me: WhoamiData | null
 }
 
 const EMPTY_FORM = {
@@ -22,7 +23,7 @@ const EMPTY_FORM = {
 }
 type FormState = typeof EMPTY_FORM
 
-export function ReceitasPage({ competencia, filters }: Props) {
+export function ReceitasPage({ competencia, filters, me }: Props) {
   const [rows, setRows] = useState<ReceitaRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +47,8 @@ export function ReceitasPage({ competencia, filters }: Props) {
   }, [competencia])
 
   const crud = useCrudForm<FormState>({
-    emptyForm: () => ({ ...EMPTY_FORM, competencia }),
+    // Prefill: competência atual + pessoa = usuário logado.
+    emptyForm: () => ({ ...EMPTY_FORM, competencia, pessoa: (me?.nome || '') as '' | Pessoa }),
     validate: (form) => {
       if (!form.competencia || !/^\d{4}-\d{2}$/.test(form.competencia)) return 'competência obrigatória (YYYY-MM)'
       if (!form.pessoa) return 'pessoa obrigatória'

@@ -1,19 +1,19 @@
 // Smoke test do PR4 — share YTD + fechamento.
 const API = process.env.VITE_API_URL
-const T = process.env.VITE_API_TOKEN
+const T = process.env.API_TOKEN
 
 const round = (n, d = 4) => Math.round(n * 10 ** d) / 10 ** d
 
 async function post(action, body) {
   const r = await fetch(API, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action, token: T, ...body }),
+    body: JSON.stringify({ action, service_token: T, ...body }),
   })
   return r.json()
 }
 async function get(action, qs = {}) {
   const u = new URL(API)
-  u.searchParams.set('action', action); u.searchParams.set('token', T)
+  u.searchParams.set('action', action); u.searchParams.set('service_token', T)
   for (const k in qs) u.searchParams.set(k, qs[k])
   return (await fetch(u)).json()
 }

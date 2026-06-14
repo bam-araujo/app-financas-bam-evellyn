@@ -21,6 +21,9 @@
         }
       })();
     </script>
+    <!-- Google Identity Services — OAuth client-side. Carrega async pra não
+         bloquear o React; useAuth aguarda window.google ficar pronto. -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <div id="root"></div>

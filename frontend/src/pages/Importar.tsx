@@ -1,5 +1,5 @@
 import { useMemo, useReducer } from 'react'
-import { batchCreate, createSerieParcelado, createSerieRecorrente } from '../api/client'
+import { batchCreate, createSerieParcelado, createSerieRecorrente, type WhoamiData } from '../api/client'
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
@@ -7,7 +7,11 @@ import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/
 import { parseItauFatura } from '../lib/parsers/itau-fatura'
 import { importarReducer, initialImportarState, type LineState } from './importarReducer'
 
-export function ImportarPage() {
+interface Props {
+  me: WhoamiData | null
+}
+
+export function ImportarPage({ me }: Props) {
   const [state, dispatch] = useReducer(importarReducer, initialImportarState)
   const { phase, error, parsed, rawLines, lines, saveResult } = state
 
@@ -38,7 +42,8 @@ export function ImportarPage() {
             : tx.descricao,
           categoria: '',
           valor_input: tx.valor > 0 ? String(tx.valor).replace('.', ',') : '',
-          pagador: 'Bam',
+          // Prefill pagador com o usuário logado (faturas geralmente são da própria pessoa).
+          pagador: (me?.nome as Pessoa) || 'Bam',
           tipo: 'conjunto',
           dono: '',
           // Se o parser detectou parcela, pré-marca como parcelado com total
