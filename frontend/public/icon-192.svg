@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="36" fill="#0a0a0a"/><g stroke="#f97316" fill="none" stroke-width="11"><line x1="58" y1="40" x2="58" y2="138" stroke-linecap="square"/><path d="M 58,60 Q 93,60 93,89 Q 93,118 58,118" stroke-linecap="round"/><line x1="134" y1="40" x2="134" y2="138" stroke-linecap="square"/><path d="M 134,60 Q 99,60 99,89 Q 99,118 134,118" stroke-linecap="round"/></g><text x="96" y="162" font-family="Tahoma, Verdana, sans-serif" font-size="13" fill="#fafafa" text-anchor="middle" letter-spacing="1.5">app de finanças</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="36" fill="#0a0a0a"/>
+  <g stroke="#f97316" fill="none" stroke-width="10">
+    <line x1="49" y1="66" x2="49" y2="118" stroke-linecap="square"/>
+    <path d="M 49,66 C 81,66 90,77 90,92 C 90,107 81,118 49,118" stroke-linecap="round"/>
+    <line x1="70" y1="56" x2="70" y2="128" stroke-linecap="square"/>
+
+    <line x1="143" y1="66" x2="143" y2="118" stroke-linecap="square"/>
+    <path d="M 143,66 C 111,66 102,77 102,92 C 102,107 111,118 143,118" stroke-linecap="round"/>
+    <line x1="122" y1="56" x2="122" y2="128" stroke-linecap="square"/>
+  </g>
+  <text x="96" y="158" font-family="Tahoma, Verdana, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">app de finanças</text>
+</svg>

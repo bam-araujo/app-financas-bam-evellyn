@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#0a0a0a"/><g stroke="#f97316" fill="none" stroke-width="30"><line x1="155" y1="110" x2="155" y2="370" stroke-linecap="square"/><path d="M 155,160 Q 248,160 248,240 Q 248,320 155,320" stroke-linecap="round"/><line x1="357" y1="110" x2="357" y2="370" stroke-linecap="square"/><path d="M 357,160 Q 264,160 264,240 Q 264,320 357,320" stroke-linecap="round"/></g><text x="256" y="432" font-family="Tahoma, Verdana, sans-serif" font-size="34" fill="#fafafa" text-anchor="middle" letter-spacing="4">app de finanças</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <g stroke="#f97316" fill="none" stroke-width="28">
+    <!-- LEFT D (letra fechada) -->
+    <line x1="130" y1="175" x2="130" y2="315" stroke-linecap="square"/>
+    <path d="M 130,175 C 215,175 240,205 240,245 C 240,285 215,315 130,315" stroke-linecap="round"/>
+    <!-- Cifrão atravessando o centro do D, extensão pequena pra fora -->
+    <line x1="185" y1="150" x2="185" y2="340" stroke-linecap="square"/>
+
+    <!-- RIGHT D espelhado -->
+    <line x1="382" y1="175" x2="382" y2="315" stroke-linecap="square"/>
+    <path d="M 382,175 C 297,175 272,205 272,245 C 272,285 297,315 382,315" stroke-linecap="round"/>
+    <line x1="327" y1="150" x2="327" y2="340" stroke-linecap="square"/>
+  </g>
+  <text x="256" y="420" font-family="Tahoma, Verdana, sans-serif" font-size="40" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="4">app de finanças</text>
+</svg>
