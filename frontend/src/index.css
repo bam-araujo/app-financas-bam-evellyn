@@ -356,7 +356,25 @@ main {
   align-items: baseline;
   gap: 0.4rem;
 }
+.filters-global .filter-icon {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
 .filters-global .filter-label { font-weight: 600; }
+.filters-global .filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+}
 .filters-global .filter-summary {
   font-size: 0.78rem;
   overflow: hidden;
@@ -594,4 +612,6 @@ code {
   .filters-body { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: stretch; }
   .page-header .btn { align-self: flex-end; }
+  /* No mobile o summary longo come espaço — esconder e deixar o badge falar. */
+  .filters-global .filter-summary { display: none; }
 }

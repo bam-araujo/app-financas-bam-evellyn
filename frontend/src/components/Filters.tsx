@@ -27,18 +27,37 @@ export function Filters({ value, onChange }: Props) {
   const cats = useCategorias()
   const set = <K extends keyof GlobalFilters>(k: K, v: GlobalFilters[K]) => onChange({ ...value, [k]: v })
 
-  // Resumo curto do que está aplicado (mostrado fechado)
+  // Resumo curto do que está aplicado (mostrado fechado, só no desktop).
   const summaryParts: string[] = []
   if (value.pessoa !== 'casal') summaryParts.push(value.pessoa)
   if (value.tipo) summaryParts.push(value.tipo === 'conjunto' ? 'conjuntas' : 'individuais')
   if (value.categoria) summaryParts.push(value.categoria)
   if (value.pessoa !== 'casal' && value.rateio) summaryParts.push('rateado')
   const summary = summaryParts.length ? summaryParts.join(' · ') : 'sem filtros'
+  // Contador pro badge — 'rateio' não conta porque depende de pessoa estar setada.
+  const activeCount = (value.pessoa !== 'casal' ? 1 : 0)
+    + (value.tipo ? 1 : 0)
+    + (value.categoria ? 1 : 0)
 
   return (
     <details className="filters filters-global">
       <summary>
+        <svg
+          className="filter-icon"
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
         <span className="filter-label">Filtros</span>
+        {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
         <span className="filter-summary muted">— {summary}</span>
       </summary>
       <div className="filters-body">
