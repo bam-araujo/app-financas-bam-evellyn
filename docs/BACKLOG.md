@@ -10,9 +10,13 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 **Tese geral da v2:** o app hoje pede pra você *registrar* o que aconteceu. O próximo salto é fazê-lo *te avisar* e *te projetar* — virar raio-x ativo da situação financeira em vez de só log do passado.
 
-> **Status atual (2026-06-14):** Tier S inteiro entregue (S1–S5, commits `5b259ee` → `010bbfe`). Próxima onda = Tier A.
+> **Status atual (2026-06-14):** Tier S inteiro entregue (S1–S5, commits `5b259ee` → `010bbfe`) + A6 do Tier A entregue (`d1a531c`). Próxima onda = resto do Tier A (A7, A8, A9, A11).
 >
 > **Polish pós-Tier S (ainda em 2026-06-14):** série recorrente virou auto-estendida (`1bfc38a`), edit/delete em série abre dialog scope (`1bfc38a`), conversão de repetição bidirecional standalone↔série↔série (`93d825a`), form de edit aparece inline (`42c19fc`), clique-novamente fecha edit (`93d825a`), dedupe import só por data+valor + default cartão=individual + save em paralelo (`56a695e`), busca global respeita competência do item (`0e89464`), Dashboard carrega em ~5s (`96bccf9`).
+>
+> **Receitas ganharam série (`5e8f958`):** mesma UX de Despesas (única/parcelada/recorrente, scope dialog, conversão bidirecional). Backend `05_Series.gs` generalizado via mapa `SERIE_TABLES`. Receitas ancoram em `competencia` (não há `data`).
+>
+> **Infra pós-Tier S:** PWA atualiza em 1 ciclo (`b81b34a` — skipWaiting+clientsClaim+reload silencioso), HTTP cache bypass em api/client.ts (`ae0bc47` — `cache: 'no-store'` resolve dado stale entre telas).
 >
 > Tier S adicionou 3 tabelas (`orcamento`, `auto_categorias`, `acertos_pagos`) e 3 endpoints de série (`extend_recorrentes`, `delete_serie_forward`, `update_serie_forward`). Já refletidos no Apps Script publicado.
 
@@ -118,21 +122,27 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ## Tier A — Alto valor, esforço médio (segunda onda)
 
-### A6. ⬜ Previsão de caixa 6 meses
+### A6. ✅ Previsão de caixa 6 meses — `d1a531c`
 
-**Esforço:** 2–3d
+**Esforço:** 2–3d (entregue em ~4h)
 
 **Por que vale:** com recorrências cadastradas, parcelas em aberto e receitas projetadas, é possível dizer "em outubro o saldo conjunto vai estar em R$X". Hoje vive na cabeça do casal.
 
-**Critério de aceite:**
-- Novo card no Dashboard: linha do tempo de saldo projetado pros próximos 6 meses.
-- Inputs: lançamentos recorrentes ativos, parcelas em aberto, receitas projetadas (média YTD de cada pessoa).
-- Mostrar pontos de "perigo" (saldo projetado < 0) em vermelho.
+**Entregue:**
+- Card "Previsão de caixa — 6 meses" no Dashboard com LineChart Recharts + tabela mês a mês (entradas, saídas, saldo). Saldo < 0 em vermelho.
+- Toggle "Conta" / "Patrimônio total" — Patrimônio soma saldoInvestimentos constante.
+- Input de "saldo em conta hoje" persistido em `localStorage` por pessoa (`dueto:saldoInicial:{casal|Bam|Evellyn}`).
+- Respeita filtro global de pessoa: casal soma tudo; Bam/Evellyn aplicam rateio (reusa `lancamentoWeight`).
+- Investimentos nominais por titular (conjunto só aparece na view casal — não há split 50/50).
+- Confia 100% nos dados cadastrados (recorrentes auto-estendidas + parcelas materializadas). Sem heurística de média YTD.
+- Premissas documentadas no rodapé do card: share do mês atual aplicado constante pros futuros.
 
-**Dicas de implementação:**
-- Hook puro `useCashflowProjection(lancamentos, receitas, mesesAhead=6)`.
-- Componente em `components/charts/PrevisaoCaixa.tsx`.
-- Saldo inicial = soma dos saldos das contas correntes (depende de **A7**) ou input manual.
+**Arquivos:**
+- `frontend/src/hooks/useCashflowProjection.ts`
+- `frontend/src/components/charts/PrevisaoCaixa.tsx`
+- `Dashboard.tsx` busca `investimentosSaldos` e calcula `saldoInvestimentosFiltrado` nominal.
+
+**Próximo refinamento natural:** quando A7 (contas correntes) for entregue, substituir o input manual de saldo inicial pela soma das contas.
 
 ---
 

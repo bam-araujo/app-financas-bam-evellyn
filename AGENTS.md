@@ -65,11 +65,11 @@ Apps Script → verifyIdToken_ → tokeninfo (assinatura+exp+aud)
 .github/workflows/deploy.yml      # build + Pages
 backend/
   00_Config.gs                    # PUBLIC_ACTIONS, RECORRENTE_HORIZON_MESES
-  01_Schema.gs                    # SCHEMA das 7 tabelas + validators (V)
+  01_Schema.gs                    # SCHEMA das 10 tabelas + validators (V)
   02_Sheets.gs                    # leitura/escrita + migration idempotente de header
   03_Main.gs                      # doGet/doPost, roteador, withLock_, reply_
   04_Crud.gs                      # list/get/create/update/delete + batch_create
-  05_Series.gs                    # create_serie (parcelado/recorrente) + shiftDateMonth_
+  05_Series.gs                    # create_serie + update/delete_serie_forward + extend_recorrentes. Mapa SERIE_TABLES: lancamentos (anchor=data) + receitas (anchor=competencia)
   06_Share.gs                     # share YTD + close/reopen
   07_InitSchema.gs                # initSchema() one-shot
   08_Auth.gs                      # verifyIdToken_, getUserByEmail_, verifyAndIdentify_
@@ -102,10 +102,12 @@ frontend/
         ChartStackedByPessoa.tsx
         EvolucaoPatrimonio.tsx
         OrcamentoCard.tsx         # top categorias com barra de progresso no Home
+        PrevisaoCaixa.tsx         # A6 — line chart + tabela projeção 6 meses (saldoInicial em localStorage)
         ResumoTotaisCard.tsx
     hooks/
       useAuth.ts                  # GIS init + sessão + currentIdToken()
       useAutoCategorias.ts        # suggest/record substring → categoria
+      useCashflowProjection.ts    # cálculo puro da projeção 6m (entradas/saídas/saldo)
       useCategorias.ts
       useCrudForm.ts              # ◆ form genérico (open/save/edit/close)
       useHashRoute.ts
@@ -128,7 +130,7 @@ frontend/
       importarReducer.ts          # 10 actions incl. SET_DUPE_FLAGS
       Investimentos.tsx           # 2x useCrudForm + useInvestimentoInsights + InvestRowList
       Orcamento.tsx               # CRUD de limite por categoria/mês + copiar mês anterior
-      Receitas.tsx                # useCrudForm + EntityList + form inline
+      Receitas.tsx                # useCrudForm + EntityList + form inline + dialog scope (mesmo padrão Despesas: repetição única/parcelada/recorrente)
 docs/
   SETUP.md                        # setup zero-to-prod
   QA-REPORT.md                    # snapshot histórico 2026-06-14 (29/29 passes)
@@ -249,6 +251,7 @@ Sempre via `frontend/src/api/client.ts`. Ele:
 - Adiciona `id_token` automaticamente (lê de `currentIdToken()`)
 - Tem retry 1× em 5xx/timeout/JSON inválido (via `TransientApiError`)
 - Devolve já desempacotado (`{ok:true, data}` é unwrappado)
+- Usa `cache: 'no-store'` em todo fetch (ver armadilha "HTTP cache em GET/POST")
 
 Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamadas avulsas.
 
@@ -281,19 +284,23 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 - **Conjuntas vs share:** Despesas mostra valor cheio na lista; Dashboard e Acerto usam rateio quando pessoa específica + toggle. Toggle só aparece quando filtra pessoa.
 - **Year inference no parser Itaú:** heurística `mes_compra > mes_venc → ano − 1`. Quebra em parcelas longas de 2+ anos antes — caso real raro, mas saiba que existe.
 - **Recorrente é auto-estendida.** Criação inicial gera 24 linhas; backend `extend_recorrentes` (chamado uma vez por sessão no boot) clona a última linha de cada série pra cobrir sempre os próximos 12 meses além da competência atual. Edição/exclusão da última linha vira o "template" pra futuras extensões.
-- **Edit/Delete em série pergunta scope.** Linhas com `serie_id` abrem `<ConfirmDialog>` com escolha "esta linha" ou "esta + futuras". Backend implementa via `update_serie_forward` e `delete_serie_forward`. Campos propagados em forward: `descricao, categoria, valor, pagador, tipo, dono` (`data` e `competencia` ficam por linha).
-- **Conversão de repetição é bidirecional.** Standalone→série, série→outro tipo, série→única — todas funcionam. Conversão de série pra outro tipo (incl. única) usa `deleteSerieForward(id, 'forward')` + cria novo conforme o tipo. Passados da série ficam preservados.
+- **Edit/Delete em série pergunta scope.** Linhas com `serie_id` abrem `<ConfirmDialog>` com escolha "esta linha" ou "esta + futuras". Backend implementa via `update_serie_forward` e `delete_serie_forward`. Os helpers `createSerie*/deleteSerieForward/updateSerieForward` no client recebem `table` como 1º arg (`'lancamentos' | 'receitas'`).
+- **Série suporta lancamentos E receitas.** Definição em `SERIE_TABLES` no [05_Series.gs](backend/05_Series.gs). Lancamentos ancoram em `data` (YYYY-MM-DD, shift mantém o dia com clamp pra mês curto). Receitas ancoram em `competencia` (YYYY-MM, sem dia). Campos propagados em forward por tabela: lancamentos = `descricao, categoria, valor, pagador, tipo, dono`; receitas = `pessoa, tipo, origem, valor, conta_para_share`. Âncora (data/competencia) NUNCA propaga — fica por linha.
+- **Conversão de repetição é bidirecional.** Standalone→série, série→outro tipo, série→única — todas funcionam. Conversão de série pra outro tipo (incl. única) usa `deleteSerieForward(table, id, 'forward')` + cria novo conforme o tipo. Passados da série ficam preservados.
 - **Conjunto não rateia em Investimentos.** Patrimônio comum tem categoria própria (`titular = conjunto`).
 - **Acerto pago é registrado, não some.** Tabela `acertos_pagos` guarda histórico. Saldo bruto = pago − devido; saldo final = saldo bruto − liquidados. Pra "zerar" um acerto, registrar pagamento (não apagar despesas).
 - **Auto-categorização** ([useAutoCategorias](frontend/src/hooks/useAutoCategorias.ts)) aprende `substring → categoria` ao salvar despesa. Substring é tokenizada (≥4 chars). Em conflito (mesma substring com categoria diferente), backend NÃO sobrescreve — tenta próximo token. `record()` não refaz refetch automático; caller que chama em batch deve invocar `refetch()` ao final.
 - **Dedupe no import** usa só `data + valor` (não inclui descrição). Aceita falso positivo (raro) pra evitar falso negativo se user renomeou.
 - **Orçamento** ([orcamento table](backend/01_Schema.gs)) é por `(competencia, categoria)`. `BudgetProgress` rende a barra; `OrcamentoCard` no Dashboard mostra top categorias por % usado.
+- **Previsão de caixa (A6)** ([PrevisaoCaixa](frontend/src/components/charts/PrevisaoCaixa.tsx) + [useCashflowProjection](frontend/src/hooks/useCashflowProjection.ts)) confia 100% nos dados cadastrados — não tem média/heurística. Saldo inicial vive em `localStorage` por pessoa (`dueto:saldoInicial:{casal|Bam|Evellyn}`). Share constante = do mês atual aplicado pros futuros. Investimentos somados nominalmente por titular (conjunto só aparece na view casal, nunca dividido 50/50).
 
 ### Frontend
 
 - **id_token expira em 1h.** Se a sessão estourar, o app pede login de novo. Aceitar.
 - **OAuth + outras sessões Google ativas:** GIS às vezes encaminha pro Gmail em vez de logar. Workaround: janela anônima ou perfil dedicado do navegador (documentado em SETUP).
 - **GitHub Pages é público.** Bundle final é acessível. Não confiar em "segredo do navegador" pra nada.
+- **HTTP cache em GET/POST.** [api/client.ts](frontend/src/api/client.ts) usa `cache: 'no-store'` em todo fetch. Sem isso, o Chrome reusa respostas GET do Apps Script por heurística (não há `Cache-Control: no-store` no response). Sintoma: editar em uma tela e ver dado stale em outra. NÃO remover.
+- **PWA atualiza em 1 ciclo.** Workbox configurado com `skipWaiting + clientsClaim + cleanupOutdatedCaches` em [vite.config.ts](frontend/vite.config.ts), e [main.tsx](frontend/src/main.tsx) escuta `controllerchange` pra disparar 1 reload silencioso quando o SW novo assume controle. Antes era preciso fechar/abrir 2-3 vezes o PWA pra ver mudanças. O guard `hadControllerAtBoot` evita reload na 1ª instalação.
 
 ---
 
@@ -319,6 +326,16 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 2. Rodar `initSchema()` no editor Apps Script pra criar a aba — OU deixar que `getOrCreateSheet_` crie sob demanda na primeira request.
 3. Adicionar tipo em `frontend/src/api/types.ts`.
 4. Exportar `makeTableApi('nome')` em `frontend/src/api/client.ts`.
+
+### Adicionar série (parcelado/recorrente) a uma tabela existente
+
+Padrão estabelecido em `lancamentos` + `receitas`. Pra habilitar série numa nova tabela:
+
+1. **Schema** (`01_Schema.gs`): adicionar colunas `serie_id, serie_tipo, parcela_num, parcela_total` em `columns` + validators correspondentes (ver `lancamentos` ou `receitas` como referência).
+2. **Série** (`05_Series.gs`): adicionar entrada em `SERIE_TABLES` com `anchor` (coluna temporal — `data` ou `competencia`) e `propagable` (campos que atravessam em scope='forward').
+3. **Frontend types** (`api/types.ts`): adicionar os 4 campos no Row + `SerieTipo`.
+4. **Frontend client** (`api/client.ts`): adicionar a tabela em `SerieTable` e `SerieRowMap`.
+5. **Página**: copiar padrão de `Despesas.tsx`/`Receitas.tsx` (form com Repetição, dialog scope, conversão bidirecional).
 
 ### Adicionar uma categoria nova
 
@@ -391,3 +408,7 @@ Roadmap de produto priorizado vive em [docs/BACKLOG.md](docs/BACKLOG.md). Tiers 
 - **Tier S de produto (2026-06-14):** commits `5b259ee` → `010bbfe`. Busca global, dedupe import, marcar acerto pago, auto-categorização, orçamento por categoria.
 - **Séries infinitas + edit/delete forward (1bfc38a):** recorrentes não têm mais limite de 24 meses; backend `extend_recorrentes` mantém cobertura rolling. Edit/Delete em série abre dialog "esta / esta + futuras".
 - **Conversão bidirecional de repetição (93d825a):** standalone↔parcelado↔recorrente↔único, todos os sentidos.
+- **Séries em Receitas (5e8f958):** `05_Series.gs` generalizado via `SERIE_TABLES`. Receitas ancoram em `competencia` (não há `data`). Helpers de série no client recebem `table` como 1º arg. Receitas.tsx ganhou mesma UX de Despesas (repetição, scope dialog, conversão).
+- **PWA atualiza em 1 ciclo (b81b34a):** workbox skipWaiting+clientsClaim + reload silencioso via `controllerchange` em main.tsx. Antes exigia abrir/fechar 2-3 vezes pra ver build novo.
+- **HTTP cache bypass (ae0bc47):** api/client.ts passa `cache: 'no-store'` em todo fetch. Sem isso, Chrome reusava GET por heurística e telas mostravam dado stale após updates.
+- **A6 — Previsão de caixa 6m (d1a531c):** card novo no Dashboard com LineChart + tabela. Hook puro `useCashflowProjection`. Saldo inicial em localStorage por pessoa. Toggle Conta/Patrimônio total. Investimentos somados nominalmente por titular.

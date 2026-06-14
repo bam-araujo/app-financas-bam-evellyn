@@ -7,8 +7,8 @@ Produção: https://bam-araujo.github.io/app-financas-bam-evellyn/
 ## Stack
 
 - **Frontend:** React + Vite + TypeScript, PWA instalável → `/frontend`
-- **Backend:** Google Apps Script (8 módulos `.gs`) → `/backend`
-- **Banco:** Google Sheets (7 abas)
+- **Backend:** Google Apps Script (9 módulos `.gs`) → `/backend`
+- **Banco:** Google Sheets (10 abas)
 - **Auth:** OAuth Google (id_token) + allowlist por email
 - **CI/CD:** GitHub Actions → Pages
 
