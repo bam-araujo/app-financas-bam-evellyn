@@ -30,6 +30,7 @@ function initSchema() {
       { nome: 'Financiamentos', grupo: 'despesa' },
       { nome: 'Serviços', grupo: 'despesa' },
       { nome: 'Compras', grupo: 'despesa' },
+      { nome: 'Reformas', grupo: 'despesa' },
       { nome: 'Outros', grupo: 'despesa' },
       { nome: 'Salário', grupo: 'receita' },
       { nome: 'Bônus', grupo: 'receita' },
