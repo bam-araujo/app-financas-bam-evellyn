@@ -10,11 +10,13 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 **Tese geral da v2:** o app hoje pede pra você *registrar* o que aconteceu. O próximo salto é fazê-lo *te avisar* e *te projetar* — virar raio-x ativo da situação financeira em vez de só log do passado.
 
+> **Status atual (2026-06-14):** Tier S inteiro entregue (S1–S5, commits `5b259ee` → `010bbfe`). Próxima onda = Tier A. **EXIGE redeploy do Apps Script** (Nova versão) — 3 tabelas novas (`acertos_pagos`, `auto_categorias`, `orcamento`) só aparecem na planilha quando o backend novo recebe a primeira request com elas no SCHEMA.
+
 ---
 
 ## Tier S — Implementar primeiro (alto valor, baixo esforço)
 
-### S1. ⬜ Orçamento por categoria/mês
+### S1. ✅ Orçamento por categoria/mês — `010bbfe`
 
 **Esforço:** 2–3d
 
@@ -35,7 +37,7 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ---
 
-### S2. ⬜ Busca global
+### S2. ✅ Busca global — `5b259ee`
 
 **Esforço:** 0.5d
 
@@ -53,7 +55,7 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ---
 
-### S3. ⬜ Dedupe ao importar
+### S3. ✅ Dedupe ao importar — `048c08b`
 
 **Esforço:** 0.5d
 
@@ -71,7 +73,7 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ---
 
-### S4. ⬜ Marcar acerto como pago
+### S4. ✅ Marcar acerto como pago — `d0df6e1`
 
 **Esforço:** 1d
 
@@ -90,7 +92,7 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ---
 
-### S5. ⬜ Auto-categorização por descrição
+### S5. ✅ Auto-categorização por descrição — `45dbaa2`
 
 **Esforço:** 1–2d
 
