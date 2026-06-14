@@ -273,7 +273,8 @@ export function InvestimentosPage({ filters }: Props) {
   }, [saldosF])
 
   // ----- forms -----
-  function openNewSaldo() {
+  function toggleNewSaldo() {
+    if (formSaldoOpen) { setFormSaldoOpen(false); setFormError(null); return }
     const presetTitular = filters.pessoa === 'casal' ? 'Bam' : (filters.pessoa as Titular)
     setFormSaldo({ ...EMPTY_SALDO, data: todayISO(), titular: presetTitular })
     setFormError(null)
@@ -287,7 +288,8 @@ export function InvestimentosPage({ filters }: Props) {
     })
     setFormError(null); setFormSaldoOpen(true); setFormMovOpen(false)
   }
-  function openNewMov() {
+  function toggleNewMov() {
+    if (formMovOpen) { setFormMovOpen(false); setFormError(null); return }
     const presetTitular = filters.pessoa === 'casal' ? 'Bam' : (filters.pessoa as Titular)
     setFormMov({ ...EMPTY_MOV, data: todayISO(), titular: presetTitular })
     setFormError(null)
@@ -372,8 +374,20 @@ export function InvestimentosPage({ filters }: Props) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button type="button" className="btn" onClick={openNewMov}>+ Aporte/Resgate</button>
-          <button type="button" className="btn btn-primary" onClick={openNewSaldo}>+ Saldo</button>
+          <button
+            type="button"
+            className={'btn' + (formMovOpen ? ' btn-active' : '')}
+            onClick={toggleNewMov}
+          >
+            {formMovOpen ? '× Fechar' : '+ Aporte/Resgate'}
+          </button>
+          <button
+            type="button"
+            className={'btn btn-primary' + (formSaldoOpen ? ' btn-active' : '')}
+            onClick={toggleNewSaldo}
+          >
+            {formSaldoOpen ? '× Fechar' : '+ Saldo'}
+          </button>
         </div>
       </header>
 

@@ -52,7 +52,8 @@ export function ReceitasPage({ competencia, filters }: Props) {
     return rows.filter((r) => r.pessoa === filters.pessoa)
   }, [rows, filters.pessoa])
 
-  function openNew() {
+  function toggleNew() {
+    if (formOpen) { setFormOpen(false); setFormError(null); return }
     setForm({ ...EMPTY_FORM, competencia })
     setFormError(null)
     setFormOpen(true)
@@ -138,8 +139,8 @@ export function ReceitasPage({ competencia, filters }: Props) {
             <span className="muted-light">(conta pro share {formatBRL(totalShare)})</span>
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openNew}>
-          + Nova
+        <button type="button" className="btn btn-primary" onClick={toggleNew}>
+          {formOpen ? '× Fechar' : '+ Nova'}
         </button>
       </header>
 

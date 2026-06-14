@@ -96,7 +96,8 @@ export function DespesasPage({ competencia, filters }: Props) {
     return share[filters.pessoa as 'Bam' | 'Evellyn']
   }
 
-  function openNew() {
+  function toggleNew() {
+    if (formOpen) { setFormOpen(false); setFormError(null); return }
     setForm({ ...EMPTY_FORM, data: todayISO() })
     setFormError(null)
     setFormOpen(true)
@@ -227,8 +228,8 @@ export function DespesasPage({ competencia, filters }: Props) {
           >
             Importar
           </button>
-          <button type="button" className="btn btn-primary" onClick={openNew}>
-            + Novo
+          <button type="button" className="btn btn-primary" onClick={toggleNew}>
+            {formOpen ? '× Fechar' : '+ Novo'}
           </button>
         </div>
       </header>
