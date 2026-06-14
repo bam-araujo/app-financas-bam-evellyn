@@ -68,6 +68,8 @@ function saveSession(s: AuthSession | null) {
 }
 
 // Ref exposta pra client.ts pegar o token corrente sem precisar de prop drill.
+// IMPORTANTE: atualizado SÍNCRONO em handleCredential/initial-load (não via
+// useEffect) pra evitar race com efeitos que disparam request logo após login.
 let currentTokenRef: { token: string | null } = { token: null }
 export function currentIdToken(): string | null {
   return currentTokenRef.token
@@ -121,16 +123,17 @@ export interface UseAuthResult {
 }
 
 export function useAuth(): UseAuthResult {
-  const [session, setSession] = useState<AuthSession | null>(() => loadSession())
+  const [session, setSession] = useState<AuthSession | null>(() => {
+    const s = loadSession()
+    // Update síncrono pra que client.ts leia o token na primeira request,
+    // sem esperar useEffect commit.
+    if (s) currentTokenRef.token = s.idToken
+    return s
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const gisRef = useRef<GisAccountsId | null>(null)
   const configured = !!CLIENT_ID
-
-  // Mantém currentTokenRef alinhado com session pra client.ts ler.
-  useEffect(() => {
-    currentTokenRef.token = session?.idToken ?? null
-  }, [session])
 
   const handleCredential = useCallback((credential: string) => {
     const payload = decodeJwtPayload(credential)
@@ -145,6 +148,9 @@ export function useAuth(): UseAuthResult {
       picture: payload.picture || '',
       expiresAt: payload.exp,
     }
+    // Update síncrono ANTES do setSession pra que qualquer efeito disparado
+    // pelo re-render seguinte (ex.: whoami no App) já encontre o token pronto.
+    currentTokenRef.token = credential
     saveSession(next)
     setSession(next)
     setError(null)
@@ -193,6 +199,9 @@ export function useAuth(): UseAuthResult {
 
   const signOut = useCallback(() => {
     gisRef.current?.disableAutoSelect()
+    // Limpa o ref síncrono antes do setState pra que requests in-flight
+    // não usem mais o token.
+    currentTokenRef.token = null
     saveSession(null)
     setSession(null)
   }, [])

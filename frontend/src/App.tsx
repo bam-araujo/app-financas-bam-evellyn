@@ -63,8 +63,9 @@ export default function App() {
   }, [])
 
   // Quando o usuário loga (ou já estava logado e o app carregou), busca whoami
-  // pra ter o nome/cor da planilha (Bam ou Evellyn) — não confiar só no name
-  // do Google porque o app personaliza pela linha da planilha.
+  // pra ter o nome/cor da planilha (Bam ou Evellyn). Só re-roda quando session
+  // muda — `auth` é objeto novo a cada render do useAuth, então NÃO entra na
+  // dep (causaria refetch infinito).
   useEffect(() => {
     if (!auth.session) { setMe(null); setMeError(null); return }
     setMeError(null)
@@ -75,7 +76,8 @@ export default function App() {
         // Se o email não tá autorizado, dá signOut: não adianta continuar logado.
         if (err.message.includes('email_not_authorized')) auth.signOut()
       })
-  }, [auth.session, auth])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.session])
 
   // Pré-login: tela de gate
   if (!auth.session) return <LoginGate auth={auth} />
