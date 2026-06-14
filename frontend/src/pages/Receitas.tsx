@@ -82,6 +82,11 @@ export function ReceitasPage({ competencia, filters, me }: Props) {
   }, [rows, filters.pessoa])
 
   function editFromRow(r: ReceitaRow) {
+    // Toggle: clicar de novo na mesma row com form aberto = fecha.
+    if (formOpen && form.id === r.id) {
+      closeForm()
+      return
+    }
     openEdit({
       id: r.id,
       competencia: r.competencia,

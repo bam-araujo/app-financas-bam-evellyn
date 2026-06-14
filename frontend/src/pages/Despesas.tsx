@@ -139,8 +139,8 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         tipo: form.tipo as 'individual' | 'conjunto',
         dono: (form.tipo === 'individual' ? (form.dono as Pessoa) : '') as Pessoa | '',
       }
-      if (form.id && form.edit_serie_tipo) {
-        // Edit em linha que faz parte de série → pergunta scope.
+      if (form.id && form.edit_serie_tipo && form.repeticao === form.edit_serie_tipo) {
+        // Edit numa linha de série, mantendo o tipo de série → scope dialog.
         const scope = await openDialog<'this' | 'forward'>({
           title: 'Aplicar mudança a quais lançamentos?',
           message: (
@@ -160,10 +160,45 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         if (scope === null) throw new Error('cancelado')
         const payload = { ...base, competencia: competenciaFromDate(form.data) }
         await updateSerieForward(form.id, scope, payload)
+      } else if (form.id && form.edit_serie_tipo) {
+        // CONVERSÃO série → outro tipo (única / outra série).
+        // Apaga essa linha e as futuras da série; passadas ficam preservadas
+        // como histórico. Cria novo lançamento conforme tipo escolhido.
+        const newTypeLabel =
+          form.repeticao === 'unico' ? 'lançamento único'
+            : form.repeticao === 'parcelado' ? `parcelado em ${form.parcelas}×`
+            : 'recorrente'
+        const confirmed = await openDialog<'go'>({
+          title: `Converter em ${newTypeLabel}?`,
+          message: (
+            <>
+              Vou apagar este lançamento <strong>e os futuros</strong> dessa série,
+              e criar um {newTypeLabel} no lugar. Os passados ficam preservados.
+              Continuar?
+            </>
+          ),
+          choices: [
+            { label: 'Sim, converter', value: 'go', primary: true },
+          ],
+        })
+        if (confirmed === null) throw new Error('cancelado')
+        await deleteSerieForward(form.id, 'forward')
+        if (form.repeticao === 'unico') {
+          await lancamentos.create({
+            ...base,
+            competencia: competenciaFromDate(form.data),
+            serie_id: '',
+            serie_tipo: '',
+            parcela_num: 0,
+            parcela_total: 0,
+          })
+        } else if (form.repeticao === 'parcelado') {
+          await createSerieParcelado(base, form.parcelas)
+        } else {
+          await createSerieRecorrente(base)
+        }
       } else if (form.id && form.repeticao !== 'unico') {
-        // CONVERSÃO: linha standalone virou parcelado/recorrente.
-        // Estratégia: deleta original + cria série nova (a primeira linha
-        // da série fica com a data do form, então o histórico fica coerente).
+        // CONVERSÃO standalone → série (única → parcelado/recorrente).
         const confirmed = await openDialog<'go'>({
           title: 'Converter em ' + (form.repeticao === 'parcelado' ? 'parcelado' : 'recorrente') + '?',
           message: (
@@ -231,6 +266,12 @@ export function DespesasPage({ competencia, filters, me }: Props) {
   const weight = (r: LancamentoRow) => lancamentoWeight(r, filters.pessoa, filters.rateio, () => share)
 
   function editFromRow(r: LancamentoRow) {
+    // Toggle: clicar de novo na MESMA row com form aberto = fecha. UX mais
+    // próxima de "tap to expand / tap again to collapse".
+    if (formOpen && form.id === r.id) {
+      closeForm()
+      return
+    }
     openEdit({
       id: r.id,
       data: r.data,
@@ -240,8 +281,13 @@ export function DespesasPage({ competencia, filters, me }: Props) {
       pagador: r.pagador,
       tipo: r.tipo,
       dono: r.dono || '',
-      repeticao: 'unico',
-      parcelas: 2,
+      // Pré-seleciona repetição = tipo atual da série. Salvar sem mudar =
+      // "edit no mesmo tipo" (vai pro flow de scope this/forward).
+      // Mudar pra outro valor = conversão (deleteSerieForward + recreate).
+      repeticao: r.serie_tipo === 'parcelado' ? 'parcelado'
+        : r.serie_tipo === 'recorrente' ? 'recorrente'
+        : 'unico',
+      parcelas: r.parcela_total && r.parcela_total >= 2 ? r.parcela_total : 2,
       edit_serie_tipo: (r.serie_tipo as '' | 'parcelado' | 'recorrente') || '',
       edit_parcela_num: r.parcela_num || 0,
       edit_parcela_total: r.parcela_total || 0,
@@ -473,36 +519,34 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </label>
           )}
 
-          {!form.edit_serie_tipo && (
-            <label>
-              <span>Repetição</span>
-              <div className="seg-group">
-                <button
-                  type="button"
-                  className={'seg' + (form.repeticao === 'unico' ? ' seg-active' : '')}
-                  onClick={() => setForm({ ...form, repeticao: 'unico' })}
-                >
-                  Único
-                </button>
-                <button
-                  type="button"
-                  className={'seg' + (form.repeticao === 'parcelado' ? ' seg-active' : '')}
-                  onClick={() => setForm({ ...form, repeticao: 'parcelado' })}
-                >
-                  Parcelado
-                </button>
-                <button
-                  type="button"
-                  className={'seg' + (form.repeticao === 'recorrente' ? ' seg-active' : '')}
-                  onClick={() => setForm({ ...form, repeticao: 'recorrente' })}
-                >
-                  Recorrente
-                </button>
-              </div>
-            </label>
-          )}
+          <label>
+            <span>Repetição</span>
+            <div className="seg-group">
+              <button
+                type="button"
+                className={'seg' + (form.repeticao === 'unico' ? ' seg-active' : '')}
+                onClick={() => setForm({ ...form, repeticao: 'unico' })}
+              >
+                Único
+              </button>
+              <button
+                type="button"
+                className={'seg' + (form.repeticao === 'parcelado' ? ' seg-active' : '')}
+                onClick={() => setForm({ ...form, repeticao: 'parcelado' })}
+              >
+                Parcelado
+              </button>
+              <button
+                type="button"
+                className={'seg' + (form.repeticao === 'recorrente' ? ' seg-active' : '')}
+                onClick={() => setForm({ ...form, repeticao: 'recorrente' })}
+              >
+                Recorrente
+              </button>
+            </div>
+          </label>
 
-          {!form.edit_serie_tipo && form.repeticao === 'parcelado' && (
+          {form.repeticao === 'parcelado' && (
             <label>
               <span>Nº de parcelas (valor digitado = valor de UMA parcela)</span>
               <input
@@ -516,11 +560,11 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </label>
           )}
 
-          {!form.edit_serie_tipo && form.repeticao === 'recorrente' && (
+          {/* Hints contextuais explicando o que vai acontecer ao salvar. */}
+          {!form.id && form.repeticao === 'recorrente' && (
             <p className="hint">
-              {form.id
-                ? 'Vai apagar essa linha e criar uma série recorrente baseada nela. Conforme o tempo passa, o app estende automaticamente.'
-                : 'Cria 24 lançamentos pra começar; conforme o tempo passa, o app estende automaticamente pra manter sempre os próximos 12 meses cobertos.'}
+              Cria 24 lançamentos pra começar; conforme o tempo passa, o app
+              estende automaticamente pra manter sempre os próximos 12 meses cobertos.
             </p>
           )}
 
@@ -531,13 +575,28 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </p>
           )}
 
-          {form.id && form.edit_serie_tipo && (
+          {form.id && !form.edit_serie_tipo && form.repeticao === 'recorrente' && (
+            <p className="hint">
+              Vai apagar essa linha e criar uma série recorrente baseada nela.
+              Conforme o tempo passa, o app estende automaticamente.
+            </p>
+          )}
+
+          {form.id && form.edit_serie_tipo && form.repeticao === form.edit_serie_tipo && (
             <p className="hint">
               Editando {form.edit_serie_tipo === 'parcelado'
                 ? `parcela ${form.edit_parcela_num}/${form.edit_parcela_total}`
                 : `mês ${form.edit_parcela_num} de uma recorrência`}.
               Ao salvar, você escolhe se a mudança vai só nessa linha ou
               propaga pra todas as futuras.
+            </p>
+          )}
+
+          {form.id && form.edit_serie_tipo && form.repeticao !== form.edit_serie_tipo && (
+            <p className="hint">
+              Mudar a repetição vai apagar este lançamento e os futuros da
+              série, e criar um novo conforme o tipo escolhido. Os passados
+              da série ficam preservados.
             </p>
           )}
 
