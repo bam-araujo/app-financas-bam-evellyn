@@ -380,6 +380,35 @@ main {
   font-size: 0.825rem;
 }
 
+/* ========== Acerto =================================================== */
+
+.resumo .acerto-final {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+.resumo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.resumo-grid > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.75rem;
+  align-items: baseline;
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.resumo-grid strong { font-variant-numeric: tabular-nums; }
+.resumo-grid .pos { color: var(--ok); }
+.resumo-grid .neg { color: var(--danger); }
+@media (max-width: 480px) {
+  .resumo-grid { grid-template-columns: 1fr; }
+}
+
 .empty {
   padding: 1.5rem;
   text-align: center;

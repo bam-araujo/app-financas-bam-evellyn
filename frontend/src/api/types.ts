@@ -64,6 +64,14 @@ export interface InvestimentoMovimentoRow extends RowBase {
   valor: number
 }
 
+export interface ShareData {
+  competencia: string
+  fechado: boolean
+  fechado_em?: string
+  Bam: number
+  Evellyn: number
+}
+
 export interface TableMap {
   pessoas: PessoaRow
   categorias: CategoriaRow

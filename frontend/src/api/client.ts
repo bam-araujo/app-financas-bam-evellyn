@@ -134,6 +134,22 @@ export function createSerieRecorrente(
   })
 }
 
+// ====== Share (rateio) ======================================================
+
+import type { ShareData } from './types'
+
+export function getShare(competencia: string): Promise<ShareData> {
+  return apiGet<ShareData>('share', { competencia })
+}
+
+export function closeShare(competencia: string): Promise<ShareData> {
+  return apiPost<ShareData>('close_share', { competencia })
+}
+
+export function reopenShare(competencia: string): Promise<{ competencia: string; deleted: number }> {
+  return apiPost<{ competencia: string; deleted: number }>('reopen_share', { competencia })
+}
+
 // ====== helpers por tabela ===================================================
 
 function makeTableApi<T extends TableName>(table: T) {

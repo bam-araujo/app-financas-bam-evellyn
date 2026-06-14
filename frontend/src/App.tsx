@@ -4,6 +4,7 @@ import { CompetenciaSelector } from './components/CompetenciaSelector'
 import { Tabs } from './components/Tabs'
 import { useHashRoute } from './hooks/useHashRoute'
 import { currentCompetencia } from './lib/competencia'
+import { AcertoPage } from './pages/Acerto'
 import { DespesasPage } from './pages/Despesas'
 import { ReceitasPage } from './pages/Receitas'
 
@@ -15,6 +16,7 @@ type ConnStatus =
 const TABS = [
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
+  { key: 'acerto', label: 'Acerto' },
 ]
 
 export default function App() {
@@ -45,7 +47,8 @@ export default function App() {
         )}
         {route === 'despesas' && <DespesasPage competencia={competencia} />}
         {route === 'receitas' && <ReceitasPage competencia={competencia} />}
-        {route !== 'despesas' && route !== 'receitas' && (
+        {route === 'acerto' && <AcertoPage competencia={competencia} />}
+        {route !== 'despesas' && route !== 'receitas' && route !== 'acerto' && (
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
