@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { batchCreate } from '../api/client'
+import { batchCreate, createSerieParcelado } from '../api/client'
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
-import { formatBRL, formatDateBR } from '../lib/format'
+import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 import { extractPdfLines } from '../lib/parsers/pdf-extract'
 import { type ParsedFatura, parseItauFatura } from '../lib/parsers/itau-fatura'
 
@@ -10,13 +10,18 @@ type LineState = {
   data: string
   descricao: string
   categoria: string
-  valor: number
+  valor_input: string       // texto editável (aceita 100,50 ou 100.50)
   pagador: Pessoa
   tipo: 'individual' | 'conjunto'
   dono: '' | Pessoa
-  parcela_num?: number
-  parcela_total?: number
+  // Repetição da linha (independente do que o parser detectou):
+  // 'unico' = cria 1 row na data; 'parcelado' = cria N rows mensais via createSerieParcelado.
+  repeticao: 'unico' | 'parcelado'
+  parcelas: number
   selected: boolean
+  // info do parser, só pra contexto/badge
+  parser_parcela_num?: number
+  parser_parcela_total?: number
 }
 
 type Phase = 'idle' | 'parsing' | 'review' | 'saving' | 'done'
@@ -49,20 +54,30 @@ export function ImportarPage() {
       setParsed(result)
       // data default = vencimento da fatura; pagador default = Bam
       const venc = result.meta.vencimento || ''
-      const initial: LineState[] = result.transactions.map((tx) => ({
-        data: venc,
-        descricao: tx.parcela_num && tx.parcela_total
-          ? `${tx.descricao} (${tx.parcela_num}/${tx.parcela_total})`
-          : tx.descricao,
-        categoria: '',
-        valor: tx.valor,
-        pagador: 'Bam',
-        tipo: 'conjunto',
-        dono: '',
-        parcela_num: tx.parcela_num,
-        parcela_total: tx.parcela_total,
-        selected: true,
-      }))
+      const initial: LineState[] = result.transactions.map((tx) => {
+        const detectouParcela = !!(tx.parcela_num && tx.parcela_total)
+        return {
+          data: venc,
+          descricao: detectouParcela
+            ? `${tx.descricao} (${tx.parcela_num}/${tx.parcela_total})`
+            : tx.descricao,
+          categoria: '',
+          valor_input: tx.valor > 0 ? String(tx.valor).replace('.', ',') : '',
+          pagador: 'Bam',
+          tipo: 'conjunto',
+          dono: '',
+          // Se o parser detectou parcela, pré-marca como parcelado com total
+          // de parcelas restantes (parcela_total - parcela_num + 1). Assim o
+          // import cria essa parcela + as próximas N que ainda não vieram.
+          repeticao: detectouParcela ? 'parcelado' : 'unico',
+          parcelas: detectouParcela
+            ? Math.max(1, (tx.parcela_total! - tx.parcela_num! + 1))
+            : 2,
+          selected: true,
+          parser_parcela_num: tx.parcela_num,
+          parser_parcela_total: tx.parcela_total,
+        }
+      })
       setLines(initial)
       setPhase('review')
     } catch (err) {
@@ -80,34 +95,76 @@ export function ImportarPage() {
   }
 
   const selectedLines = lines.filter((l) => l.selected)
-  const total = selectedLines.reduce((s, l) => s + l.valor, 0)
-  const allReady = selectedLines.length > 0 && selectedLines.every((l) =>
-    l.data && l.descricao.trim() && l.categoria && l.valor > 0 && l.pagador && l.tipo &&
-    (l.tipo === 'individual' ? !!l.dono : !l.dono),
-  )
+  const total = selectedLines.reduce((s, l) => s + parseBRL(l.valor_input), 0)
+  function lineReady(l: LineState): boolean {
+    const v = parseBRL(l.valor_input)
+    if (!l.data || !l.descricao.trim() || !l.categoria || !v || v <= 0) return false
+    if (!l.pagador || !l.tipo) return false
+    if (l.tipo === 'individual' && !l.dono) return false
+    if (l.tipo === 'conjunto' && l.dono) return false
+    if (l.repeticao === 'parcelado' && (l.parcelas < 2 || l.parcelas > 60)) return false
+    return true
+  }
+  const allReady = selectedLines.length > 0 && selectedLines.every(lineReady)
 
   async function salvar() {
     setError(null)
     setPhase('saving')
     try {
-      const items: CreatePayload<'lancamentos'>[] = selectedLines.map((l) => ({
-        data: l.data,
-        competencia: l.data.slice(0, 7),
-        descricao: l.descricao.trim(),
-        categoria: l.categoria,
-        valor: l.valor,
-        pagador: l.pagador,
-        tipo: l.tipo,
-        dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
-        serie_id: '',
-        serie_tipo: '',
-        parcela_num: 0,
-        parcela_total: 0,
-      }))
-      const res = await batchCreate('lancamentos', items)
-      const okN = res.results.filter((r) => r.ok).length
-      const errs = res.results.filter((r) => !r.ok).map((r) => (r as { error: string }).error)
-      setSaveResult({ ok: okN, fail: errs.length, errors: errs.slice(0, 5) })
+      // Separa em 2 grupos: únicos (batch) e parcelados (1 chamada per linha)
+      const unicos: { line: LineState; payload: CreatePayload<'lancamentos'> }[] = []
+      const parcelados: LineState[] = []
+      for (const l of selectedLines) {
+        if (l.repeticao === 'parcelado' && l.parcelas >= 2) {
+          parcelados.push(l)
+        } else {
+          unicos.push({
+            line: l,
+            payload: {
+              data: l.data,
+              competencia: l.data.slice(0, 7),
+              descricao: l.descricao.trim(),
+              categoria: l.categoria,
+              valor: parseBRL(l.valor_input),
+              pagador: l.pagador,
+              tipo: l.tipo,
+              dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
+              serie_id: '',
+              serie_tipo: '',
+              parcela_num: 0,
+              parcela_total: 0,
+            },
+          })
+        }
+      }
+
+      let ok = 0
+      const errs: string[] = []
+
+      if (unicos.length) {
+        const res = await batchCreate('lancamentos', unicos.map((u) => u.payload))
+        ok += res.results.filter((r) => r.ok).length
+        for (const r of res.results) if (!r.ok) errs.push((r as { error: string }).error)
+      }
+
+      for (const l of parcelados) {
+        try {
+          const r = await createSerieParcelado({
+            data: l.data,
+            descricao: l.descricao.trim(),
+            categoria: l.categoria,
+            valor: parseBRL(l.valor_input),
+            pagador: l.pagador,
+            tipo: l.tipo,
+            dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
+          }, l.parcelas)
+          ok += r.count
+        } catch (err) {
+          errs.push(`série "${l.descricao}": ${(err as Error).message}`)
+        }
+      }
+
+      setSaveResult({ ok, fail: errs.length, errors: errs.slice(0, 5) })
       setPhase('done')
     } catch (err) {
       setError((err as Error).message)
@@ -212,7 +269,15 @@ export function ImportarPage() {
                       onChange={(e) => update(i, { descricao: e.target.value })}
                       className="grow"
                     />
-                    <span className="row-valor">{formatBRL(l.valor)}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={l.valor_input}
+                      onChange={(e) => update(i, { valor_input: e.target.value })}
+                      className="valor"
+                      title="Valor (editável)"
+                    />
                   </div>
                   <div className="import-line">
                     <select
@@ -249,6 +314,32 @@ export function ImportarPage() {
                         <option value="Bam">Bam</option>
                         <option value="Evellyn">Evellyn</option>
                       </select>
+                    )}
+                  </div>
+                  <div className="import-line">
+                    <select
+                      value={l.repeticao}
+                      onChange={(e) => update(i, { repeticao: e.target.value as 'unico' | 'parcelado' })}
+                      title="Repetição"
+                    >
+                      <option value="unico">Único</option>
+                      <option value="parcelado">Parcelado</option>
+                    </select>
+                    {l.repeticao === 'parcelado' && (
+                      <input
+                        type="number"
+                        min={2}
+                        max={60}
+                        value={l.parcelas}
+                        onChange={(e) => update(i, { parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) })}
+                        title="Nº de parcelas (cria N linhas mensais a partir desta data)"
+                        className="parcelas"
+                      />
+                    )}
+                    {l.parser_parcela_num && l.parser_parcela_total && (
+                      <span className="muted-light" style={{ fontSize: '0.75rem' }}>
+                        parser detectou {l.parser_parcela_num}/{l.parser_parcela_total}
+                      </span>
                     )}
                   </div>
                 </div>

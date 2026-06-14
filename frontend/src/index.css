@@ -456,6 +456,8 @@ main {
   font-family: inherit;
 }
 .import-line .row-valor { font-size: 0.95rem; }
+.import-line .valor { width: 6rem; text-align: right; font-variant-numeric: tabular-nums; }
+.import-line .parcelas { width: 4rem; text-align: center; }
 
 .empty {
   padding: 1.5rem;
