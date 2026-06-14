@@ -70,12 +70,19 @@ frontend/src/
 
 Critério: maior alívio de duplicação primeiro, depois polimento de UX. Cada item é commitável sozinho.
 
-1. **`useCrudForm` + `EntityList`** — derruba Despesas/Receitas de ~700 linhas pra ~300. Padrão se replica em Categorias se um dia virar tela.
-2. **Quebrar Investimentos** — começa por `useInvestimentoInsights` (puro, fácil de testar). Depois `EvolucaoPatrimonio` e `InvestRowList`.
-3. **Reducer em Importar** — abrir um `importarReducer.ts` ao lado da página. Ação por evento (`SET_CATEGORIA`, `TOGGLE_DUP`, `BATCH_PARSED`, …).
-4. **UX mobile do cabeçalho** — colapsar filtros num botão "filtros" com badge de contagem.
-5. **Retry no `api/client.ts`** — 1 retry em 5xx/timeout, backoff de 800ms. Cobertura: erro transient do Apps Script some.
-6. **Tipos gerados do SCHEMA** — só vale quando outra propriedade for adicionada (drift hipotético hoje).
+- ~~**`useCrudForm` + `EntityList`** — derruba Despesas/Receitas de ~700 linhas pra ~300.~~ (`5de6a79`)
+- ~~**Quebrar Investimentos** — `useInvestimentoInsights` + `EvolucaoPatrimonio` + `InvestRowList`.~~ (`efaae7d`)
+- ~~**Reducer em Importar** — `importarReducer.ts` com 9 actions.~~ (`791522c`)
+- ~~**Filtros mobile** — ícone de funil + badge de contagem; texto longo só desktop.~~ (`2e1e09a`)
+- ~~**Retry no `api/client.ts`** — `TransientApiError` + 1 retry com 800ms.~~ (`cd669da`)
+- **Tipos gerados do SCHEMA** — pendente; só vale quando outra propriedade for adicionada (drift hipotético hoje).
+
+### Obs de UX do QA-REPORT que ainda não foram atacadas
+
+- **Form de Importar denso no mobile** — 3 sub-linhas por item. Funciona mas é apertado. Possível: collapse em "tap para expandir".
+- **Cards do Dashboard empilhados em mobile** — scroll longo. Talvez accordions / "ver mais".
+- **Acerto com saldo zero** — tabela mostra muitos campos vazios; melhorar mensagem vazia.
+- **Investimentos com 1 snapshot só** — card de insights mostra "—" pra rentabilidade. Tornar explícito ("precisa de 2 snapshots").
 
 ## Comandos úteis
 
