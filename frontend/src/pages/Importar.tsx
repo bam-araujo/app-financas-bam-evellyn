@@ -1,38 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer } from 'react'
 import { batchCreate, createSerieParcelado, createSerieRecorrente } from '../api/client'
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
-import { type ParsedFatura, parseItauFatura } from '../lib/parsers/itau-fatura'
-
-type LineState = {
-  data: string
-  descricao: string
-  categoria: string
-  valor_input: string       // texto editável (aceita 100,50 ou 100.50)
-  pagador: Pessoa
-  tipo: 'individual' | 'conjunto'
-  dono: '' | Pessoa
-  // Repetição da linha (independente do que o parser detectou):
-  // 'unico' = cria 1 row; 'parcelado' = cria N rows mensais; 'recorrente' = 24 meses.
-  repeticao: 'unico' | 'parcelado' | 'recorrente'
-  parcelas: number
-  selected: boolean
-  // info do parser, só pra contexto/badge
-  parser_parcela_num?: number
-  parser_parcela_total?: number
-}
-
-type Phase = 'idle' | 'parsing' | 'review' | 'saving' | 'done'
+import { parseItauFatura } from '../lib/parsers/itau-fatura'
+import { importarReducer, initialImportarState, type LineState } from './importarReducer'
 
 export function ImportarPage() {
-  const [phase, setPhase] = useState<Phase>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [parsed, setParsed] = useState<ParsedFatura | null>(null)
-  const [rawLines, setRawLines] = useState<string[]>([])
-  const [lines, setLines] = useState<LineState[]>([])
-  const [saveResult, setSaveResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null)
+  const [state, dispatch] = useReducer(importarReducer, initialImportarState)
+  const { phase, error, parsed, rawLines, lines, saveResult } = state
 
   const cats = useCategorias()
   const despesaCats = useMemo(
@@ -43,18 +20,14 @@ export function ImportarPage() {
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setError(null)
-    setSaveResult(null)
-    setPhase('parsing')
+    dispatch({ type: 'PARSE_START' })
     try {
       const linesMeta = await extractPdfLinesWithMeta(file)
-      setRawLines(linesMeta.map((l) => l.text))
+      const rawLines = linesMeta.map((l) => l.text)
       const result = parseItauFatura(linesMeta.map((l) => ({ text: l.text, x: l.x })))
       if (result.transactions.length === 0) {
         throw new Error('Nenhuma transação encontrada — o PDF parece não ser uma fatura Itaú.')
       }
-      setParsed(result)
-      // data default = vencimento da fatura; pagador default = Bam
       const venc = result.meta.vencimento || ''
       const initial: LineState[] = result.transactions.map((tx) => {
         const detectouParcela = !!(tx.parcela_num && tx.parcela_total)
@@ -69,8 +42,8 @@ export function ImportarPage() {
           tipo: 'conjunto',
           dono: '',
           // Se o parser detectou parcela, pré-marca como parcelado com total
-          // de parcelas restantes (parcela_total - parcela_num + 1). Assim o
-          // import cria essa parcela + as próximas N que ainda não vieram.
+          // de parcelas restantes (parcela_total - parcela_num + 1) — assim
+          // o import cria essa parcela + as próximas N que ainda não vieram.
           repeticao: detectouParcela ? 'parcelado' : 'unico',
           parcelas: detectouParcela
             ? Math.max(1, (tx.parcela_total! - tx.parcela_num! + 1))
@@ -80,20 +53,10 @@ export function ImportarPage() {
           parser_parcela_total: tx.parcela_total,
         }
       })
-      setLines(initial)
-      setPhase('review')
+      dispatch({ type: 'PARSE_OK', rawLines, parsed: result, lines: initial })
     } catch (err) {
-      setError((err as Error).message)
-      setPhase('idle')
+      dispatch({ type: 'PARSE_FAIL', error: (err as Error).message })
     }
-  }
-
-  function update(i: number, patch: Partial<LineState>) {
-    setLines((arr) => arr.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
-  }
-
-  function toggleAll(selected: boolean) {
-    setLines((arr) => arr.map((l) => ({ ...l, selected })))
   }
 
   const selectedLines = lines.filter((l) => l.selected)
@@ -111,8 +74,7 @@ export function ImportarPage() {
   const allReady = selectedLines.length > 0 && selectedLines.every(lineReady)
 
   async function salvar() {
-    setError(null)
-    setPhase('saving')
+    dispatch({ type: 'SAVE_START' })
     try {
       // Separa em 3 grupos: únicos (batch), parcelados (1 chamada/linha), recorrentes (1 chamada/linha)
       const unicos: { line: LineState; payload: CreatePayload<'lancamentos'> }[] = []
@@ -187,21 +149,10 @@ export function ImportarPage() {
         }
       }
 
-      setSaveResult({ ok, fail: errs.length, errors: errs.slice(0, 5) })
-      setPhase('done')
+      dispatch({ type: 'SAVE_OK', result: { ok, fail: errs.length, errors: errs.slice(0, 5) } })
     } catch (err) {
-      setError((err as Error).message)
-      setPhase('review')
+      dispatch({ type: 'SAVE_FAIL', error: (err as Error).message })
     }
-  }
-
-  function reset() {
-    setPhase('idle')
-    setParsed(null)
-    setRawLines([])
-    setLines([])
-    setError(null)
-    setSaveResult(null)
   }
 
   return (
@@ -257,7 +208,7 @@ export function ImportarPage() {
             </ul>
           )}
           <div className="form-actions">
-            <button type="button" className="btn btn-primary" onClick={reset}>Importar outra fatura</button>
+            <button type="button" className="btn btn-primary" onClick={() => dispatch({ type: 'RESET' })}>Importar outra fatura</button>
           </div>
         </div>
       )}
@@ -277,9 +228,9 @@ export function ImportarPage() {
               )}
             </p>
             <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button type="button" className="btn" onClick={() => toggleAll(true)}>Selecionar todas</button>
-              <button type="button" className="btn" onClick={() => toggleAll(false)}>Limpar seleção</button>
-              <button type="button" className="btn" onClick={reset}>Trocar arquivo</button>
+              <button type="button" className="btn" onClick={() => dispatch({ type: 'TOGGLE_ALL', selected: true })}>Selecionar todas</button>
+              <button type="button" className="btn" onClick={() => dispatch({ type: 'TOGGLE_ALL', selected: false })}>Limpar seleção</button>
+              <button type="button" className="btn" onClick={() => dispatch({ type: 'RESET' })}>Trocar arquivo</button>
             </div>
             {rawLines.length > 0 && (
               <details style={{ marginTop: '0.75rem' }}>
@@ -331,7 +282,7 @@ export function ImportarPage() {
                   <input
                     type="checkbox"
                     checked={l.selected}
-                    onChange={(e) => update(i, { selected: e.target.checked })}
+                    onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { selected: e.target.checked } })}
                   />
                 </label>
                 <div className="import-row-body">
@@ -339,12 +290,12 @@ export function ImportarPage() {
                     <input
                       type="date"
                       value={l.data}
-                      onChange={(e) => update(i, { data: e.target.value })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { data: e.target.value } })}
                     />
                     <input
                       type="text"
                       value={l.descricao}
-                      onChange={(e) => update(i, { descricao: e.target.value })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { descricao: e.target.value } })}
                       className="grow"
                     />
                     <input
@@ -352,7 +303,7 @@ export function ImportarPage() {
                       inputMode="decimal"
                       placeholder="0,00"
                       value={l.valor_input}
-                      onChange={(e) => update(i, { valor_input: e.target.value })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { valor_input: e.target.value } })}
                       className="valor"
                       title="Valor (editável)"
                     />
@@ -360,7 +311,7 @@ export function ImportarPage() {
                   <div className="import-line">
                     <select
                       value={l.categoria}
-                      onChange={(e) => update(i, { categoria: e.target.value })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { categoria: e.target.value } })}
                     >
                       <option value="">— categoria —</option>
                       {despesaCats.map((c) => (
@@ -369,14 +320,14 @@ export function ImportarPage() {
                     </select>
                     <select
                       value={l.tipo}
-                      onChange={(e) => update(i, { tipo: e.target.value as 'individual' | 'conjunto', dono: '' })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { tipo: e.target.value as 'individual' | 'conjunto', dono: '' } })}
                     >
                       <option value="conjunto">Conjunta</option>
                       <option value="individual">Individual</option>
                     </select>
                     <select
                       value={l.pagador}
-                      onChange={(e) => update(i, { pagador: e.target.value as Pessoa })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { pagador: e.target.value as Pessoa } })}
                       title="Pagador"
                     >
                       <option value="Bam">Bam</option>
@@ -385,7 +336,7 @@ export function ImportarPage() {
                     {l.tipo === 'individual' && (
                       <select
                         value={l.dono}
-                        onChange={(e) => update(i, { dono: e.target.value as Pessoa })}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { dono: e.target.value as Pessoa } })}
                         title="Dono"
                       >
                         <option value="">— dono —</option>
@@ -397,7 +348,7 @@ export function ImportarPage() {
                   <div className="import-line">
                     <select
                       value={l.repeticao}
-                      onChange={(e) => update(i, { repeticao: e.target.value as 'unico' | 'parcelado' | 'recorrente' })}
+                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { repeticao: e.target.value as 'unico' | 'parcelado' | 'recorrente' } })}
                       title="Repetição"
                     >
                       <option value="unico">Único</option>
@@ -410,7 +361,7 @@ export function ImportarPage() {
                         min={2}
                         max={60}
                         value={l.parcelas}
-                        onChange={(e) => update(i, { parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) })}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) } })}
                         title="Nº de parcelas (cria N linhas mensais a partir desta data)"
                         className="parcelas"
                       />
@@ -432,7 +383,7 @@ export function ImportarPage() {
           {error && <p className="error-msg">{error}</p>}
 
           <div className="form-actions" style={{ position: 'sticky', bottom: 0, background: 'var(--bg)', padding: '0.75rem 0' }}>
-            <button type="button" className="btn" onClick={reset} disabled={phase === 'saving'}>Cancelar</button>
+            <button type="button" className="btn" onClick={() => dispatch({ type: 'RESET' })} disabled={phase === 'saving'}>Cancelar</button>
             <button
               type="button"
               className="btn btn-primary"
