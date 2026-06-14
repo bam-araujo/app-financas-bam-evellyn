@@ -8,9 +8,17 @@ import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/
 import { parseItauFatura } from '../lib/parsers/itau-fatura'
 import { importarReducer, initialImportarState, type LineState } from './importarReducer'
 
-/** Hash de match pro dedupe: data + valor (2 casas) + início da descrição. */
-function dupeKey(data: string, valor: number, descricao: string): string {
-  return `${data}|${valor.toFixed(2)}|${descricao.slice(0, 30).toLowerCase().trim()}`
+/**
+ * Hash de match pro dedupe: data + valor.
+ *
+ * Por que NÃO usar descrição: o usuário renomeia (ex.: 'PG*POSTOOSCAR' →
+ * 'Posto') depois do save, e a próxima fatura traz o nome bruto do parser
+ * de novo — sem match em descrição, falso negativo. Aqui aceitamos falso
+ * positivo (dois gastos de R$50 no mesmo dia em lojas diferentes) que é
+ * raro e custa só um clique pra remarcar manualmente.
+ */
+function dupeKey(data: string, valor: number): string {
+  return `${data}|${valor.toFixed(2)}`
 }
 
 interface Props {
@@ -55,8 +63,10 @@ export function ImportarPage({ me }: Props) {
           valor_input: tx.valor > 0 ? String(tx.valor).replace('.', ',') : '',
           // Prefill pagador com o usuário logado (faturas geralmente são da própria pessoa).
           pagador: (me?.nome as Pessoa) || 'Bam',
-          tipo: 'conjunto',
-          dono: '',
+          // Cartão é pessoal — default individual com dono = logged user.
+          // Conjuntas dentro da fatura são exceção; usuário marca manualmente.
+          tipo: 'individual',
+          dono: (me?.nome as Pessoa) || 'Bam',
           // Se o parser detectou parcela, pré-marca como parcelado com total
           // de parcelas restantes (parcela_total - parcela_num + 1) — assim
           // o import cria essa parcela + as próximas N que ainda não vieram.
@@ -83,11 +93,11 @@ export function ImportarPage({ me }: Props) {
         if (compAnterior) lookups.push(lancamentosApi.list({ competencia: compAnterior }))
         const existing = (await Promise.all(lookups)).flat()
         const existingKeys = new Set(
-          existing.map((r) => dupeKey(r.data, Number(r.valor) || 0, r.descricao || '')),
+          existing.map((r) => dupeKey(r.data, Number(r.valor) || 0)),
         )
         const dupeIdx: number[] = []
         initial.forEach((line, i) => {
-          const k = dupeKey(line.data, parseBRL(line.valor_input), line.descricao)
+          const k = dupeKey(line.data, parseBRL(line.valor_input))
           if (existingKeys.has(k)) dupeIdx.push(i)
         })
         if (dupeIdx.length > 0) {
@@ -205,11 +215,19 @@ export function ImportarPage({ me }: Props) {
 
       dispatch({ type: 'SAVE_OK', result: { ok, fail: errs.length, errors: errs.slice(0, 5) } })
 
-      // Registra mappings de cada linha salva pra próximas importações.
-      // Não-bloqueante; cada linha sequencial pra evitar rajada no Apps Script.
+      // Registra mappings das linhas salvas pra próximas importações.
+      // Dedupe em memória primeiro (mesma descricao+categoria não precisa
+      // gravar 2x) e roda em paralelo — antes era serial com refetch a cada
+      // record, custando ~1min em fatura com 30 linhas.
+      const seen = new Set<string>()
+      const recordJobs: Array<Promise<void>> = []
       for (const l of selectedLines) {
-        await autoCat.record(l.descricao.trim(), l.categoria).catch(() => undefined)
+        const key = `${l.descricao.trim().toLowerCase()}|${l.categoria}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        recordJobs.push(autoCat.record(l.descricao.trim(), l.categoria).catch(() => undefined))
       }
+      Promise.all(recordJobs).then(() => autoCat.refetch())
     } catch (err) {
       dispatch({ type: 'SAVE_FAIL', error: (err as Error).message })
     }

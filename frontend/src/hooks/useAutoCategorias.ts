@@ -67,33 +67,33 @@ export function useAutoCategorias(): UseAutoCategoriasResult {
     return bestCat
   }, [mappings])
 
+  /**
+   * Grava o mapping. Não dispara refetch automático — chamada repetida
+   * em batch (ex.: ao salvar N linhas do Import) ficaria O(N) chamadas
+   * extras. Caller deve chamar `refetch()` manualmente após batch.
+   */
   const record = useCallback(async (descricao: string, categoria: string) => {
     if (!descricao || !categoria) return
     const candidates = extractSubstrings(descricao)
     if (candidates.length === 0) return
-    // Pega o primeiro candidato que ainda não tem mapping conflitante.
     for (const sub of candidates) {
       const existing = mappings.find((m) => String(m.substring || '').toLowerCase() === sub)
       if (existing) {
         if (existing.categoria === categoria) {
-          // Mesmo mapping — incrementa hits e sai.
           try {
             await autoCategorias.update(existing.id, { hits: (Number(existing.hits) || 0) + 1 })
           } catch { /* não-bloqueante */ }
-          refetch()
           return
         }
         // Conflito: mesmo substring → categoria diferente. Skip, tenta próximo candidato.
         continue
       }
-      // Novo mapping
       try {
         await autoCategorias.create({ substring: sub, categoria, hits: 1 })
       } catch { /* não-bloqueante */ }
-      refetch()
       return
     }
-  }, [mappings, refetch])
+  }, [mappings])
 
   return { loading, mappings, suggest, record, refetch }
 }
