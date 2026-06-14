@@ -1,6 +1,10 @@
-# App de Finanças — Bam & Evellyn · Backlog de PRs
+# App de Finanças — Bam & Evellyn · PRs 1–7 (HISTÓRICO)
 
-Documento de handoff para um agente de código. Implementar em ordem: cada PR depende do anterior. Validar/mergear um antes de iniciar o próximo.
+> **Status: todos os 7 PRs entregues.** Este documento serve como **registro do escopo inicial** — não é mais backlog ativo. Para entender o estado atual e os padrões adotados, ver [AGENTS.md](AGENTS.md). Para o snapshot de QA, ver [docs/QA-REPORT.md](docs/QA-REPORT.md).
+
+---
+
+Documento de handoff que orientou a implementação inicial. Cada PR foi implementado em ordem; após a sequência completa, o app teve uma bateria de QA E2E + refactor de qualidade + migração OAuth.
 
 ## Contexto e arquitetura
 

@@ -1,6 +1,8 @@
-# QA E2E + Notas de Refactor
+# QA E2E + Notas de Refactor (snapshot histórico)
 
-> Gerado em 2026-06-14. Bateria de testes em `backend/qa-e2e.mjs`.
+> **Snapshot de 2026-06-14.** Documento congelado — todos os refactors listados na seção "Candidatos" foram entregues entre `5de6a79` e `cd669da`. Bateria em [`backend/qa-e2e.mjs`](../backend/qa-e2e.mjs) (29/29 passes).
+>
+> Pra entender o estado atual e os padrões adotados, ver [AGENTS.md](../AGENTS.md). Esta página fica aqui como evidência da qualidade no ponto da migração OAuth.
 
 ## Resumo
 

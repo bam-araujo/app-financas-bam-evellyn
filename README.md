@@ -1,20 +1,33 @@
-# App de Finanças — Bam & Evellyn
+# Dueto — App de Finanças do Casal
 
-PWA de controle financeiro do casal. **Custo zero**: Google Sheets (banco) + Google Apps Script (API) + GitHub Pages (host).
+PWA de controle financeiro para duas pessoas (Bam e Evellyn). **Custo zero**: Google Sheets (banco) + Google Apps Script (API) + GitHub Pages (host) + Google OAuth (auth).
 
-- Regras do projeto: `AGENTS.md`
-- Backlog dos PRs: `PRs-app-financas.md`
-- Setup passo a passo: `docs/SETUP.md`
+Produção: https://bam-araujo.github.io/app-financas-bam-evellyn/
+
+## Stack
+
+- **Frontend:** React + Vite + TypeScript, PWA instalável → `/frontend`
+- **Backend:** Google Apps Script (8 módulos `.gs`) → `/backend`
+- **Banco:** Google Sheets (7 abas)
+- **Auth:** OAuth Google (id_token) + allowlist por email
+- **CI/CD:** GitHub Actions → Pages
 
 ## Estrutura
 
 ```
 frontend/   # PWA React + Vite + TS
-backend/    # Google Apps Script (módulos 00_Config..08_Auth)
-docs/       # SETUP.md e afins
+backend/    # Apps Script (módulos 00_Config..08_Auth) + scripts QA .mjs
+docs/       # SETUP.md (zero-to-prod) e QA-REPORT.md (histórico)
 ```
 
-## Rodar local (após SETUP.md)
+## Para começar
+
+- **Quer entender o projeto antes de mexer em qualquer coisa?** [AGENTS.md](AGENTS.md) — onboarding completo: regras, arquitetura, padrões, cookbook, armadilhas.
+- **Subir do zero (setup manual no Google Cloud + Apps Script + Pages)?** [docs/SETUP.md](docs/SETUP.md).
+- **Histórico dos 7 PRs originais?** [PRs-app-financas.md](PRs-app-financas.md).
+- **Snapshot da bateria QA E2E?** [docs/QA-REPORT.md](docs/QA-REPORT.md).
+
+## Rodar local (depois do SETUP)
 
 ```bash
 cd frontend
@@ -22,3 +35,5 @@ cp .env.example .env.local   # preencher VITE_API_URL e VITE_GOOGLE_CLIENT_ID
 npm install
 npm run dev
 ```
+
+Detalhes (incluindo configurar OAuth no Google Cloud, popular a aba `pessoas`, etc.) em [docs/SETUP.md](docs/SETUP.md).
