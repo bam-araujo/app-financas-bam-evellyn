@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getShare, investimentosMovimentos, lancamentos, receitas } from '../api/client'
-import type { InvestimentoMovimentoRow, LancamentoRow, ReceitaRow, ShareData } from '../api/types'
+import { getShare, investimentosMovimentos, investimentosSaldos, lancamentos, receitas } from '../api/client'
+import type { InvestimentoMovimentoRow, InvestimentoSaldoRow, LancamentoRow, ReceitaRow, ShareData } from '../api/types'
 import { ChartCategoryPie } from '../components/charts/ChartCategoryPie'
 import { ChartMonthlyFlow } from '../components/charts/ChartMonthlyFlow'
 import { ChartStackedByPessoa } from '../components/charts/ChartStackedByPessoa'
 import { OrcamentoCard } from '../components/charts/OrcamentoCard'
+import { PrevisaoCaixa } from '../components/charts/PrevisaoCaixa'
 import { ResumoTotaisCard } from '../components/charts/ResumoTotaisCard'
 import type { GlobalFilters } from '../components/Filters'
 import { shiftCompetencia } from '../lib/competencia'
@@ -46,6 +47,7 @@ export function DashboardPage({ competencia, filters }: Props) {
   const [allLanc, setAllLanc] = useState<LancamentoRow[]>([])
   const [allRec, setAllRec] = useState<ReceitaRow[]>([])
   const [allInv, setAllInv] = useState<InvestimentoMovimentoRow[]>([])
+  const [allInvSaldos, setAllInvSaldos] = useState<InvestimentoSaldoRow[]>([])
   const [shares, setShares] = useState<Record<string, ShareData>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -66,11 +68,13 @@ export function DashboardPage({ competencia, filters }: Props) {
       lancamentos.list(),
       receitas.list(),
       investimentosMovimentos.list().catch(() => []),
+      investimentosSaldos.list().catch(() => [] as InvestimentoSaldoRow[]),
     ])
-      .then(([ls, rs, invs]) => {
+      .then(([ls, rs, invs, sals]) => {
         setAllLanc(ls)
         setAllRec(rs)
         setAllInv(invs)
+        setAllInvSaldos(sals)
         setLoading(false)
         // Fase 2 (lenta, em background): shares por competência. Não bloqueia
         // o render. Quando completar, dashboard re-renderiza com números
@@ -124,6 +128,24 @@ export function DashboardPage({ competencia, filters }: Props) {
       return true
     })
   }, [allInv, start, end, pessoa])
+
+  /** Saldo atual de investimentos = soma do snapshot mais recente por chave
+   *  (titular|instituicao|ativo), filtrado nominalmente por titular conforme
+   *  o filtro de pessoa. casal=tudo (inclui conjunto). Bam/Evellyn=apenas
+   *  titular igual (NÃO inclui conjunto — esses só aparecem na view casal).
+   *  Usado pela view "Patrimônio total" em PrevisaoCaixa. */
+  const saldoInvestimentosFiltrado = useMemo(() => {
+    const latest = new Map<string, InvestimentoSaldoRow>()
+    for (const s of allInvSaldos) {
+      if (pessoa !== 'casal' && s.titular !== pessoa) continue
+      const k = `${s.titular}|${s.instituicao}|${s.ativo}`
+      const cur = latest.get(k)
+      if (!cur || (s.data || '').localeCompare(cur.data || '') > 0) latest.set(k, s)
+    }
+    let total = 0
+    for (const s of latest.values()) total += Number(s.valor_saldo) || 0
+    return total
+  }, [allInvSaldos, pessoa])
 
   // Totais
   const totalDespesas = despesasFiltradas.reduce((s, x) => s + Number(x.row.valor) * x.w, 0)
@@ -253,6 +275,15 @@ export function DashboardPage({ competencia, filters }: Props) {
       {error && <p className="error-msg">Erro: {error}</p>}
 
       <OrcamentoCard competencia={competencia} lancamentos={allLanc} />
+
+      <PrevisaoCaixa
+        competenciaAtual={competencia}
+        lancamentos={allLanc}
+        receitas={allRec}
+        saldoInvestimentos={saldoInvestimentosFiltrado}
+        share={shares[competencia] ?? null}
+        pessoa={pessoa}
+      />
 
       <ChartMonthlyFlow data={porMes} />
       <ChartCategoryPie data={porCategoria} totalDespesas={totalDespesas} />
