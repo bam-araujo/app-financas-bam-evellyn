@@ -193,6 +193,17 @@ const SCHEMA = {
       fechado_em: V.stringOptional,
     },
   },
+  // Limite de gasto planejado por (competencia, categoria). Página de
+  // Orçamento define; Dashboard e Despesas mostram barra de progresso.
+  orcamento: {
+    columns: ['id', 'competencia', 'categoria', 'limite'],
+    required: ['competencia', 'categoria', 'limite'],
+    validators: {
+      competencia: V.month,
+      categoria: V.stringRequired,
+      limite: V.number,
+    },
+  },
   // Mapeamentos "substring → categoria" aprendidos com o histórico.
   // Usado pra sugerir categoria automaticamente no Import e no form de
   // Despesas. Substring sempre minúscula, trimmed. Hits incrementado a

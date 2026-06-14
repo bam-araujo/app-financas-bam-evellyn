@@ -4,6 +4,7 @@ import type { InvestimentoMovimentoRow, LancamentoRow, ReceitaRow, ShareData } f
 import { ChartCategoryPie } from '../components/charts/ChartCategoryPie'
 import { ChartMonthlyFlow } from '../components/charts/ChartMonthlyFlow'
 import { ChartStackedByPessoa } from '../components/charts/ChartStackedByPessoa'
+import { OrcamentoCard } from '../components/charts/OrcamentoCard'
 import { ResumoTotaisCard } from '../components/charts/ResumoTotaisCard'
 import type { GlobalFilters } from '../components/Filters'
 import { shiftCompetencia } from '../lib/competencia'
@@ -241,6 +242,8 @@ export function DashboardPage({ competencia, filters }: Props) {
 
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}
+
+      <OrcamentoCard competencia={competencia} />
 
       <ChartMonthlyFlow data={porMes} />
       <ChartCategoryPie data={porCategoria} totalDespesas={totalDespesas} />

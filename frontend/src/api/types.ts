@@ -87,6 +87,12 @@ export interface AutoCategoriaRow extends RowBase {
   hits: number
 }
 
+export interface OrcamentoRow extends RowBase {
+  competencia: string          // YYYY-MM
+  categoria: string
+  limite: number
+}
+
 export interface TableMap {
   pessoas: PessoaRow
   categorias: CategoriaRow
@@ -96,6 +102,7 @@ export interface TableMap {
   investimentos_movimentos: InvestimentoMovimentoRow
   acertos_pagos: AcertoPagoRow
   auto_categorias: AutoCategoriaRow
+  orcamento: OrcamentoRow
 }
 
 export type TableName = keyof TableMap

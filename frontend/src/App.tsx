@@ -15,6 +15,7 @@ import { DashboardPage } from './pages/Dashboard'
 import { DespesasPage } from './pages/Despesas'
 import { ImportarPage } from './pages/Importar'
 import { InvestimentosPage } from './pages/Investimentos'
+import { OrcamentoPage } from './pages/Orcamento'
 import { ReceitasPage } from './pages/Receitas'
 
 type ConnStatus =
@@ -26,6 +27,7 @@ const TABS = [
   { key: 'home', label: 'Home' },
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
+  { key: 'orcamento', label: 'Orçamento' },
   { key: 'acerto', label: 'Acerto' },
   { key: 'investimentos', label: 'Investimentos' },
 ]
@@ -161,10 +163,11 @@ export default function App() {
         {(route === 'home' || route === 'dashboard') && <DashboardPage competencia={competencia} filters={filters} />}
         {route === 'despesas' && <DespesasPage competencia={competencia} filters={filters} me={me} />}
         {route === 'receitas' && <ReceitasPage competencia={competencia} filters={filters} me={me} />}
+        {route === 'orcamento' && <OrcamentoPage competencia={competencia} />}
         {route === 'acerto' && <AcertoPage competencia={competencia} />}
         {route === 'investimentos' && <InvestimentosPage filters={filters} me={me} />}
         {route === 'importar' && <ImportarPage me={me} />}
-        {!['home', 'dashboard', 'despesas', 'receitas', 'acerto', 'investimentos', 'importar'].includes(route) && (
+        {!['home', 'dashboard', 'despesas', 'receitas', 'orcamento', 'acerto', 'investimentos', 'importar'].includes(route) && (
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
