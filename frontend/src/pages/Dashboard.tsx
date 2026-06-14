@@ -61,23 +61,32 @@ export function DashboardPage({ competencia, filters }: Props) {
   function reload() {
     setLoading(true)
     setError(null)
+    // Fase 1 (rápida): lists. Após isso já dá pra renderizar charts.
     Promise.all([
       lancamentos.list(),
       receitas.list(),
       investimentosMovimentos.list().catch(() => []),
     ])
-      .then(async ([ls, rs, invs]) => {
+      .then(([ls, rs, invs]) => {
         setAllLanc(ls)
         setAllRec(rs)
         setAllInv(invs)
+        setLoading(false)
+        // Fase 2 (lenta, em background): shares por competência. Não bloqueia
+        // o render. Quando completar, dashboard re-renderiza com números
+        // precisos (relevante só quando filter pessoa != 'casal').
         const competencias = listMonthsInRange(start, end)
-        const sharesArr = await Promise.all(competencias.map((c) => getShare(c).catch(() => null)))
-        const map: Record<string, ShareData> = {}
-        competencias.forEach((c, i) => { if (sharesArr[i]) map[c] = sharesArr[i] as ShareData })
-        setShares(map)
+        Promise.all(competencias.map((c) => getShare(c).catch(() => null)))
+          .then((sharesArr) => {
+            const map: Record<string, ShareData> = {}
+            competencias.forEach((c, i) => { if (sharesArr[i]) map[c] = sharesArr[i] as ShareData })
+            setShares(map)
+          })
       })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false))
+      .catch((err: Error) => {
+        setError(err.message)
+        setLoading(false)
+      })
   }
 
   useEffect(() => { reload() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [competencia, periodo])
@@ -243,7 +252,7 @@ export function DashboardPage({ competencia, filters }: Props) {
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}
 
-      <OrcamentoCard competencia={competencia} />
+      <OrcamentoCard competencia={competencia} lancamentos={allLanc} />
 
       <ChartMonthlyFlow data={porMes} />
       <ChartCategoryPie data={porCategoria} totalDespesas={totalDespesas} />

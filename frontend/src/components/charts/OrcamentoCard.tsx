@@ -6,29 +6,42 @@ import { BudgetProgress } from '../BudgetProgress'
 
 /**
  * Card de orçamento no Dashboard. Mostra as top categorias da competência
- * atual com barra de progresso. Faz fetch próprio pra não acoplar com o
- * pacote pesado do DashboardPage (que opera em range histórico).
+ * atual com barra de progresso.
+ *
+ * Aceita `lancamentos` por prop pra reaproveitar o fetch que o pai já fez —
+ * se vier null/undefined, faz fetch próprio (uso standalone). Evita disparar
+ * `lancamentos.list()` duas vezes na Home quando montado dentro do Dashboard.
  */
 interface Props {
   competencia: string
+  /** Lançamentos do contexto. Se vier, filtramos pela competência aqui. */
+  lancamentos?: LancamentoRow[] | null
   topN?: number
 }
 
-export function OrcamentoCard({ competencia, topN = 6 }: Props) {
+export function OrcamentoCard({ competencia, lancamentos: lancFromProp, topN = 6 }: Props) {
   const [orcs, setOrcs] = useState<OrcamentoRow[]>([])
-  const [lancs, setLancs] = useState<LancamentoRow[]>([])
+  const [lancsLocal, setLancsLocal] = useState<LancamentoRow[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Se o pai passou lançamentos, só busca orcamento. Caso contrário, busca os
+  // dois (modo standalone).
   useEffect(() => {
     setLoading(true)
-    Promise.all([
-      orcamentoApi.list({ competencia }),
-      lancamentosApi.list({ competencia }),
-    ])
-      .then(([os, ls]) => { setOrcs(os); setLancs(ls) })
-      .catch(() => { setOrcs([]); setLancs([]) })
+    const fetches: Promise<unknown>[] = [
+      orcamentoApi.list({ competencia }).then((os) => setOrcs(os)),
+    ]
+    if (!lancFromProp) {
+      fetches.push(lancamentosApi.list({ competencia }).then((ls) => setLancsLocal(ls)))
+    }
+    Promise.all(fetches)
+      .catch(() => { /* silencia — render do card já trata orcs vazio */ })
       .finally(() => setLoading(false))
-  }, [competencia])
+  }, [competencia, !!lancFromProp])
+
+  const lancs: LancamentoRow[] = lancFromProp
+    ? lancFromProp.filter((l) => String(l.competencia || '').startsWith(competencia))
+    : lancsLocal
 
   const items = useMemo(() => {
     const gastos = new Map<string, number>()
