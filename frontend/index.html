@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0a0a" />
     <title>Dueto — Finanças do casal</title>
+    <script>
+      // Aplica o tema ANTES do CSS/React carregar — evita flash entre
+      // preferência do SO e preferência salva pelo usuário.
+      (function () {
+        try {
+          var saved = localStorage.getItem('dueto.theme');
+          var t = (saved === 'light' || saved === 'dark')
+            ? saved
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (_) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

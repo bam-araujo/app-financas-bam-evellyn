@@ -3,37 +3,44 @@
      embarcam Tahoma; Verdana e Geneva são as mais próximas). */
   font-family: Tahoma, Verdana, Geneva, sans-serif;
   color-scheme: light dark;
+}
 
-  /* Paleta Dueto: laranja + preto */
+/* Light (default) e dark — aplicados via data-theme no <html> pra permitir
+   toggle manual do usuário. O index.html tem um script inline que lê
+   localStorage e seta data-theme antes do CSS carregar (zero flash). */
+
+[data-theme="light"] {
   --bg: #fafafa;
   --bg-card: #ffffff;
   --fg: #0a0a0a;
   --fg-muted: #525252;
   --fg-light: #a3a3a3;
   --border: #e5e5e5;
-  --primary: #0a0a0a;          /* preto pra botões primários */
+  --primary: #0a0a0a;
   --primary-fg: #ffffff;
-  --accent: #ea580c;           /* laranja-600 — links, focus rings, tab ativa */
-  --accent-soft: #f97316;      /* laranja-500 — fills de gráfico */
+  --accent: #ea580c;
+  --accent-soft: #f97316;
   --danger: #b91c1c;
   --ok: #16a34a;
   --warn: #f59e0b;
   --row-hover: #f5f5f5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0a0a0a;
-    --bg-card: #171717;
-    --fg: #fafafa;
-    --fg-muted: #a3a3a3;
-    --fg-light: #525252;
-    --border: #262626;
-    --primary: #f97316;        /* laranja vira primário no dark — destaca */
-    --primary-fg: #0a0a0a;
-    --accent: #f97316;
-    --row-hover: #262626;
-  }
+[data-theme="dark"] {
+  --bg: #0a0a0a;
+  --bg-card: #171717;
+  --fg: #fafafa;
+  --fg-muted: #a3a3a3;
+  --fg-light: #525252;
+  --border: #262626;
+  --primary: #f97316;
+  --primary-fg: #0a0a0a;
+  --accent: #f97316;
+  --accent-soft: #fb923c;
+  --danger: #ef4444;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --row-hover: #262626;
 }
 
 * { box-sizing: border-box; }
@@ -74,6 +81,26 @@ main {
   align-items: center;
   justify-content: space-between;
 }
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--accent); background: var(--row-hover); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .app-header h1 {
   margin: 0;
   font-size: 1.125rem;
