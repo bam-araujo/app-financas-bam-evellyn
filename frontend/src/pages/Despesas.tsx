@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos, type WhoamiData } from '../api/client'
+import {
+  createSerieParcelado,
+  createSerieRecorrente,
+  deleteSerieForward,
+  getShare,
+  lancamentos,
+  updateSerieForward,
+  type WhoamiData,
+} from '../api/client'
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
 import { useAutoCategorias } from '../hooks/useAutoCategorias'
@@ -49,6 +58,34 @@ export function DespesasPage({ competencia, filters, me }: Props) {
     [cats.data],
   )
   const autoCat = useAutoCategorias()
+
+  // Dialog imperativo: openDialog devolve Promise que resolve com a opção
+  // escolhida (ou null se fechou via overlay/Esc). Usado pra perguntar
+  // scope quando o usuário edita/exclui linha de série.
+  type DialogChoice<T> = { label: string; value: T; primary?: boolean; danger?: boolean }
+  interface DialogState {
+    title: string
+    message?: React.ReactNode
+    options: { label: string; onClick: () => void; primary?: boolean; danger?: boolean }[]
+    onClose: () => void
+  }
+  const [dialogState, setDialogState] = useState<DialogState | null>(null)
+  function openDialog<T>(config: { title: string; message?: React.ReactNode; choices: DialogChoice<T>[] }): Promise<T | null> {
+    return new Promise((resolve) => {
+      const close = () => { setDialogState(null); resolve(null) }
+      setDialogState({
+        title: config.title,
+        message: config.message,
+        options: config.choices.map((c) => ({
+          label: c.label,
+          primary: c.primary,
+          danger: c.danger,
+          onClick: () => { setDialogState(null); resolve(c.value) },
+        })),
+        onClose: close,
+      })
+    })
+  }
 
   function fetchList() {
     setLoading(true)
@@ -100,8 +137,29 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         tipo: form.tipo as 'individual' | 'conjunto',
         dono: (form.tipo === 'individual' ? (form.dono as Pessoa) : '') as Pessoa | '',
       }
-      if (form.id) {
-        // Edit: sempre uma linha por vez (mesmo se for parcela de série)
+      if (form.id && form.edit_serie_tipo) {
+        // Edit em linha que faz parte de série → pergunta scope.
+        const scope = await openDialog<'this' | 'forward'>({
+          title: 'Aplicar mudança a quais lançamentos?',
+          message: (
+            <>
+              Esse é {form.edit_serie_tipo === 'parcelado'
+                ? `a parcela ${form.edit_parcela_num}/${form.edit_parcela_total}`
+                : `um lançamento recorrente`}. Mudanças em descrição,
+              categoria, valor, pagador, tipo ou dono podem ser propagadas
+              pras linhas futuras da série.
+            </>
+          ),
+          choices: [
+            { label: 'Esta + todas as futuras', value: 'forward', primary: true },
+            { label: 'Só esta linha', value: 'this' },
+          ],
+        })
+        if (scope === null) throw new Error('cancelado')
+        const payload = { ...base, competencia: competenciaFromDate(form.data) }
+        await updateSerieForward(form.id, scope, payload)
+      } else if (form.id) {
+        // Edit linha standalone
         await lancamentos.update(form.id, { ...base, competencia: competenciaFromDate(form.data) })
       } else if (form.repeticao === 'parcelado') {
         await createSerieParcelado(base, form.parcelas)
@@ -165,6 +223,33 @@ export function DespesasPage({ competencia, filters, me }: Props) {
   }
 
   async function remove(r: LancamentoRow) {
+    if (r.serie_id && r.serie_tipo) {
+      // Linha de série → dialog 3 opções
+      const scope = await openDialog<'this' | 'forward'>({
+        title: 'Excluir quais lançamentos?',
+        message: (
+          <>
+            Esse é {r.serie_tipo === 'parcelado'
+              ? `a parcela ${r.parcela_num}/${r.parcela_total}`
+              : `um lançamento recorrente`}. Você pode excluir só esta
+            linha ou propagar a exclusão pras futuras da mesma série.
+          </>
+        ),
+        choices: [
+          { label: 'Esta + todas as futuras', value: 'forward', danger: true },
+          { label: 'Só esta linha', value: 'this', danger: true },
+        ],
+      })
+      if (scope === null) return
+      try {
+        await deleteSerieForward(r.id, scope)
+        fetchList()
+      } catch (err) {
+        alert('Erro ao excluir: ' + (err as Error).message)
+      }
+      return
+    }
+    // Linha standalone — confirm simples basta.
     if (!confirm('Excluir esse lançamento?')) return
     try {
       await lancamentos.remove(r.id)
@@ -357,7 +442,8 @@ export function DespesasPage({ competencia, filters, me }: Props) {
 
           {!form.id && form.repeticao === 'recorrente' && (
             <p className="hint">
-              Vai criar 24 lançamentos (próximos 24 meses, mesmo dia).
+              Cria 24 lançamentos pra começar; conforme o tempo passa, o app
+              estende automaticamente pra manter sempre os próximos 12 meses cobertos.
             </p>
           )}
 
@@ -366,7 +452,8 @@ export function DespesasPage({ competencia, filters, me }: Props) {
               Editando {form.edit_serie_tipo === 'parcelado'
                 ? `parcela ${form.edit_parcela_num}/${form.edit_parcela_total}`
                 : `mês ${form.edit_parcela_num} de uma recorrência`}.
-              Mudanças só afetam essa linha.
+              Ao salvar, você escolhe se a mudança vai só nessa linha ou
+              propaga pra todas as futuras.
             </p>
           )}
 
@@ -411,6 +498,14 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </div>
           </>
         )}
+      />
+
+      <ConfirmDialog
+        open={!!dialogState}
+        title={dialogState?.title || ''}
+        message={dialogState?.message}
+        options={dialogState?.options || []}
+        onClose={() => dialogState?.onClose()}
       />
     </section>
   )

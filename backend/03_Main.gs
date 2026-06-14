@@ -47,6 +47,9 @@ function handle_(e, fromPost) {
       case 'update':       return reply_({ ok: true, data: withLock_(function () { return update_(params); }) });
       case 'delete':       return reply_({ ok: true, data: withLock_(function () { return delete_(params); }) });
       case 'create_serie': return reply_({ ok: true, data: withLock_(function () { return createSerie_(params); }) });
+      case 'extend_recorrentes': return reply_({ ok: true, data: withLock_(function () { return extendRecorrentes_(params); }) });
+      case 'delete_serie_forward': return reply_({ ok: true, data: withLock_(function () { return deleteSerieForward_(params); }) });
+      case 'update_serie_forward': return reply_({ ok: true, data: withLock_(function () { return updateSerieForward_(params); }) });
       case 'share':        return reply_({ ok: true, data: shareForCompetencia_(params) });
       case 'close_share':  return reply_({ ok: true, data: withLock_(function () { return closeShare_(params); }) });
       case 'reopen_share': return reply_({ ok: true, data: withLock_(function () { return reopenShare_(params); }) });

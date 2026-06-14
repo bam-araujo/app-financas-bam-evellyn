@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ping, whoami, type WhoamiData } from './api/client'
+import { useEffect, useRef, useState } from 'react'
+import { extendRecorrentes, ping, whoami, type WhoamiData } from './api/client'
 import { CompetenciaSelector } from './components/CompetenciaSelector'
 import { DEFAULT_FILTERS, Filters, type GlobalFilters } from './components/Filters'
 import { LoginGate } from './components/LoginGate'
@@ -42,6 +42,9 @@ export default function App() {
   const [route, navigate] = useHashRoute('home')
   const { theme, toggle: toggleTheme } = useTheme()
   const [searchOpen, setSearchOpen] = useState(false)
+  // Auto-extend rodado uma vez por sessão pra não bater no Apps Script toda vez
+  // que o user muda de competência. Idempotente no backend, mas economiza request.
+  const extendedRef = useRef(false)
 
   // Atalho global Cmd/Ctrl+K abre a paleta. Listener ativo só quando logado.
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function App() {
   // muda — `auth` é objeto novo a cada render do useAuth, então NÃO entra na
   // dep (causaria refetch infinito).
   useEffect(() => {
-    if (!auth.session) { setMe(null); setMeError(null); return }
+    if (!auth.session) { setMe(null); setMeError(null); extendedRef.current = false; return }
     setMeError(null)
     whoami()
       .then(setMe)
@@ -76,6 +79,13 @@ export default function App() {
         // Se o email não tá autorizado, dá signOut: não adianta continuar logado.
         if (err.message.includes('email_not_authorized')) auth.signOut()
       })
+    // Auto-extend recorrentes pra cobrir os próximos 12 meses. Idempotente —
+    // se já estão cobertos, backend só responde {extended: 0}. Não bloqueia
+    // o login se falhar.
+    if (!extendedRef.current) {
+      extendedRef.current = true
+      extendRecorrentes(competencia).catch(() => undefined)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.session])
 

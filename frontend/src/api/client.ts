@@ -197,6 +197,42 @@ export function createSerieRecorrente(
   })
 }
 
+/** Estende séries recorrentes até cobrir `throughCompetencia` + 12 meses. Idempotente. */
+export function extendRecorrentes(throughCompetencia: string): Promise<{ extended: number; through: string }> {
+  return apiPost<{ extended: number; through: string }>('extend_recorrentes', {
+    through_competencia: throughCompetencia,
+  })
+}
+
+export type SerieScope = 'this' | 'forward'
+
+/** Delete uma linha ('this') ou linha + futuras da mesma série ('forward'). */
+export function deleteSerieForward(id: string, scope: SerieScope): Promise<{ id: string; deleted: number; serie_id?: string }> {
+  return apiPost<{ id: string; deleted: number; serie_id?: string }>('delete_serie_forward', {
+    table: 'lancamentos',
+    id,
+    scope,
+  })
+}
+
+/**
+ * Update uma linha ('this') ou propaga campos pra linha + futuras ('forward').
+ * Em 'forward', só descricao/categoria/valor/pagador/tipo/dono propagam — data
+ * e competencia ficam por linha.
+ */
+export function updateSerieForward(
+  id: string,
+  scope: SerieScope,
+  fields: Partial<Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'data' | 'competencia'>>,
+): Promise<{ id: string; updated?: number; serie_id?: string }> {
+  return apiPost('update_serie_forward', {
+    table: 'lancamentos',
+    id,
+    scope,
+    fields,
+  })
+}
+
 // ====== Share (rateio) ======================================================
 
 import type { ShareData } from './types'

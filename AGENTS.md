@@ -237,7 +237,8 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 
 - **Conjuntas vs share:** Despesas mostra valor cheio na lista; Dashboard e Acerto usam rateio quando pessoa específica + toggle. Toggle só aparece quando filtra pessoa.
 - **Year inference no parser Itaú:** heurística `mes_compra > mes_venc → ano − 1`. Quebra em parcelas longas de 2+ anos antes — caso real raro, mas saiba que existe.
-- **Recorrente cria 24 meses fixos.** Sem auto-extend. Usuário precisa estender manualmente perto do fim.
+- **Recorrente é auto-estendida.** Criação inicial gera 24 linhas; backend `extend_recorrentes` (chamado uma vez por sessão no boot) clona a última linha de cada série pra cobrir sempre os próximos 12 meses além da competência atual. Edição/exclusão da última linha vira o "template" pra futuras extensões.
+- **Edit/Delete em série pergunta scope.** Linhas com `serie_id` abrem `<ConfirmDialog>` com escolha "esta linha" ou "esta + futuras". Backend implementa via `update_serie_forward` e `delete_serie_forward`. Campos propagados em forward: `descricao, categoria, valor, pagador, tipo, dono` (`data` e `competencia` ficam por linha).
 - **Conjunto não rateia em Investimentos.** Patrimônio comum tem categoria própria (`titular = conjunto`).
 
 ### Frontend

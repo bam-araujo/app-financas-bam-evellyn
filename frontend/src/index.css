@@ -211,6 +211,47 @@ main {
   .orcamento-list { grid-template-columns: 1fr 1fr; }
 }
 
+/* ========== Generic dialog =========================================== */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 110;
+}
+.dialog-card {
+  width: min(420px, 100%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 1.25rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.dialog-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+.dialog-message {
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.btn-danger {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+.btn-danger:hover { background: #dc2626 !important; }
+
 /* ========== Search palette =========================================== */
 
 .search-toggle {
