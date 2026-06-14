@@ -488,10 +488,7 @@ function initSchema() {
     seedRow_('pessoas', { nome: 'Evellyn' }, { nome: 'Evellyn', cor: '#db2777' });
 
     var cats = [
-      { nome: 'Aluguel', grupo: 'despesa' },
-      { nome: 'Condomínio', grupo: 'despesa' },
       { nome: 'Energia', grupo: 'despesa' },
-      { nome: 'Água', grupo: 'despesa' },
       { nome: 'Internet', grupo: 'despesa' },
       { nome: 'Mercado', grupo: 'despesa' },
       { nome: 'Restaurante', grupo: 'despesa' },
@@ -500,8 +497,10 @@ function initSchema() {
       { nome: 'Lazer', grupo: 'despesa' },
       { nome: 'Assinaturas', grupo: 'despesa' },
       { nome: 'Educação', grupo: 'despesa' },
-      { nome: 'Roupas', grupo: 'despesa' },
       { nome: 'Presentes', grupo: 'despesa' },
+      { nome: 'Financiamentos', grupo: 'despesa' },
+      { nome: 'Serviços', grupo: 'despesa' },
+      { nome: 'Compras', grupo: 'despesa' },
       { nome: 'Outros', grupo: 'despesa' },
       { nome: 'Salário', grupo: 'receita' },
       { nome: 'Bônus', grupo: 'receita' },
