@@ -3,6 +3,7 @@ import { ping, whoami, type WhoamiData } from './api/client'
 import { CompetenciaSelector } from './components/CompetenciaSelector'
 import { DEFAULT_FILTERS, Filters, type GlobalFilters } from './components/Filters'
 import { LoginGate } from './components/LoginGate'
+import { SearchPalette } from './components/SearchPalette'
 import { Tabs } from './components/Tabs'
 import { useAuth } from './hooks/useAuth'
 import { useHashRoute } from './hooks/useHashRoute'
@@ -38,6 +39,20 @@ export default function App() {
   const [filters, setFilters] = useState<GlobalFilters>(DEFAULT_FILTERS)
   const [route, navigate] = useHashRoute('home')
   const { theme, toggle: toggleTheme } = useTheme()
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Atalho global Cmd/Ctrl+K abre a paleta. Listener ativo só quando logado.
+  useEffect(() => {
+    if (!auth.session) return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [auth.session])
 
   useEffect(() => {
     ping()
@@ -80,6 +95,18 @@ export default function App() {
                 <span className="user-nome">{me.nome}</span>
               </span>
             )}
+            <button
+              type="button"
+              className="search-toggle"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Buscar (Ctrl+K)"
+              title="Buscar (Ctrl+K)"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </button>
             <button
               type="button"
               className="theme-toggle"
@@ -141,6 +168,8 @@ export default function App() {
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
+
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )
 }
