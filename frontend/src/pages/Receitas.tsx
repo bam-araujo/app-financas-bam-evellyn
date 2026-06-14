@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { receitas } from '../api/client'
 import type { Pessoa, ReceitaRow } from '../api/types'
+import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
+import { useCrudForm } from '../hooks/useCrudForm'
 import { formatBRL, formatCompetenciaBR, parseBRL } from '../lib/format'
 
 interface Props {
@@ -24,10 +26,6 @@ export function ReceitasPage({ competencia, filters }: Props) {
   const [rows, setRows] = useState<ReceitaRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
-  const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, competencia })
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
 
   function fetchList() {
     setLoading(true)
@@ -47,53 +45,17 @@ export function ReceitasPage({ competencia, filters }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia])
 
-  const filtered = useMemo(() => {
-    if (filters.pessoa === 'casal') return rows
-    return rows.filter((r) => r.pessoa === filters.pessoa)
-  }, [rows, filters.pessoa])
-
-  function toggleNew() {
-    if (formOpen) { setFormOpen(false); setFormError(null); return }
-    setForm({ ...EMPTY_FORM, competencia })
-    setFormError(null)
-    setFormOpen(true)
-  }
-
-  function openEdit(r: ReceitaRow) {
-    setForm({
-      id: r.id,
-      competencia: r.competencia,
-      pessoa: r.pessoa,
-      tipo: r.tipo,
-      origem: r.origem || '',
-      valor: String(r.valor).replace('.', ','),
-      conta_para_share: r.conta_para_share,
-    })
-    setFormError(null)
-    setFormOpen(true)
-  }
-
-  function closeForm() {
-    setFormOpen(false)
-    setFormError(null)
-  }
-
-  function validateForm(): string | null {
-    if (!form.competencia || !/^\d{4}-\d{2}$/.test(form.competencia)) return 'competência obrigatória (YYYY-MM)'
-    if (!form.pessoa) return 'pessoa obrigatória'
-    if (!form.tipo) return 'tipo obrigatório'
-    const v = parseBRL(form.valor)
-    if (!v || v <= 0) return 'valor inválido'
-    return null
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    const err = validateForm()
-    if (err) { setFormError(err); return }
-    setSaving(true)
-    setFormError(null)
-    try {
+  const crud = useCrudForm<FormState>({
+    emptyForm: () => ({ ...EMPTY_FORM, competencia }),
+    validate: (form) => {
+      if (!form.competencia || !/^\d{4}-\d{2}$/.test(form.competencia)) return 'competência obrigatória (YYYY-MM)'
+      if (!form.pessoa) return 'pessoa obrigatória'
+      if (!form.tipo) return 'tipo obrigatório'
+      const v = parseBRL(form.valor)
+      if (!v || v <= 0) return 'valor inválido'
+      return null
+    },
+    save: async (form) => {
       const payload = {
         competencia: form.competencia,
         pessoa: form.pessoa as Pessoa,
@@ -107,19 +69,32 @@ export function ReceitasPage({ competencia, filters }: Props) {
       } else {
         await receitas.create(payload)
       }
-      closeForm()
-      fetchList()
-    } catch (err) {
-      setFormError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
+    },
+    onSaved: fetchList,
+  })
+  const { form, setForm, formOpen, saving, formError, toggleNew, openEdit, closeForm, submit } = crud
+
+  const filtered = useMemo(() => {
+    if (filters.pessoa === 'casal') return rows
+    return rows.filter((r) => r.pessoa === filters.pessoa)
+  }, [rows, filters.pessoa])
+
+  function editFromRow(r: ReceitaRow) {
+    openEdit({
+      id: r.id,
+      competencia: r.competencia,
+      pessoa: r.pessoa,
+      tipo: r.tipo,
+      origem: r.origem || '',
+      valor: String(r.valor).replace('.', ','),
+      conta_para_share: r.conta_para_share,
+    })
   }
 
-  async function remove(id: string) {
+  async function remove(r: ReceitaRow) {
     if (!confirm('Excluir essa receita?')) return
     try {
-      await receitas.remove(id)
+      await receitas.remove(r.id)
       fetchList()
     } catch (err) {
       alert('Erro ao excluir: ' + (err as Error).message)
@@ -225,29 +200,27 @@ export function ReceitasPage({ competencia, filters }: Props) {
         </form>
       )}
 
-      {loading && <p className="muted">Carregando…</p>}
-      {error && <p className="error-msg">Erro: {error}</p>}
-      {!loading && !error && filtered.length === 0 && (
-        <p className="empty">Nenhuma receita para {formatCompetenciaBR(competencia, 'long')}.</p>
-      )}
-
-      <ul className="rows">
-        {filtered.map((r) => (
-          <li key={r.id} className="row">
-            <button type="button" className="row-main" onClick={() => openEdit(r)}>
-              <div className="row-top">
-                <strong>{r.pessoa} · {r.tipo}</strong>
-                <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
-              </div>
-              <div className="row-meta">
-                {r.origem && <span>{r.origem} · </span>}
-                <span>{r.conta_para_share ? 'conta pro share' : 'fora do share'}</span>
-              </div>
-            </button>
-            <button type="button" className="row-del" onClick={() => remove(r.id)} aria-label="Excluir">×</button>
-          </li>
-        ))}
-      </ul>
+      <EntityList
+        loading={loading}
+        error={error}
+        emptyMsg={`Nenhuma receita para ${formatCompetenciaBR(competencia, 'long')}.`}
+        items={filtered}
+        itemKey={(r) => r.id}
+        onEdit={editFromRow}
+        onDelete={remove}
+        renderRow={(r) => (
+          <>
+            <div className="row-top">
+              <strong>{r.pessoa} · {r.tipo}</strong>
+              <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
+            </div>
+            <div className="row-meta">
+              {r.origem && <span>{r.origem} · </span>}
+              <span>{r.conta_para_share ? 'conta pro share' : 'fora do share'}</span>
+            </div>
+          </>
+        )}
+      />
     </section>
   )
 }

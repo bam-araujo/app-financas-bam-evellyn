@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos } from '../api/client'
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
+import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
 import { useCategorias } from '../hooks/useCategorias'
+import { useCrudForm } from '../hooks/useCrudForm'
 import { competenciaFromDate, todayISO } from '../lib/competencia'
 import { formatBRL, formatCompetenciaBR, formatDateBR, parseBRL } from '../lib/format'
 import { lancamentoWeight } from '../lib/rateio'
@@ -38,10 +40,6 @@ export function DespesasPage({ competencia, filters }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [share, setShare] = useState<ShareData | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
-  const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, data: todayISO() })
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
 
   const cats = useCategorias()
   const despesaCats = useMemo(
@@ -70,6 +68,55 @@ export function DespesasPage({ competencia, filters }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia])
 
+  const crud = useCrudForm<FormState>({
+    emptyForm: () => ({ ...EMPTY_FORM, data: todayISO() }),
+    validate: (form) => {
+      if (!form.data) return 'data obrigatória'
+      if (!form.descricao.trim()) return 'descrição obrigatória'
+      if (!form.categoria) return 'categoria obrigatória'
+      const v = parseBRL(form.valor)
+      if (!v || v <= 0) return 'valor inválido'
+      if (!form.pagador) return 'pagador obrigatório'
+      if (!form.tipo) return 'tipo obrigatório'
+      if (form.tipo === 'individual' && !form.dono) return 'dono obrigatório quando tipo=individual'
+      if (!form.id && form.repeticao === 'parcelado') {
+        if (!form.parcelas || form.parcelas < 2) return 'nº de parcelas deve ser >= 2'
+        if (form.parcelas > 60) return 'nº de parcelas muito alto (máx 60)'
+      }
+      return null
+    },
+    save: async (form) => {
+      const base = {
+        data: form.data,
+        descricao: form.descricao.trim(),
+        categoria: form.categoria,
+        valor: parseBRL(form.valor),
+        pagador: form.pagador as Pessoa,
+        tipo: form.tipo as 'individual' | 'conjunto',
+        dono: (form.tipo === 'individual' ? (form.dono as Pessoa) : '') as Pessoa | '',
+      }
+      if (form.id) {
+        // Edit: sempre uma linha por vez (mesmo se for parcela de série)
+        await lancamentos.update(form.id, { ...base, competencia: competenciaFromDate(form.data) })
+      } else if (form.repeticao === 'parcelado') {
+        await createSerieParcelado(base, form.parcelas)
+      } else if (form.repeticao === 'recorrente') {
+        await createSerieRecorrente(base)
+      } else {
+        await lancamentos.create({
+          ...base,
+          competencia: competenciaFromDate(form.data),
+          serie_id: '',
+          serie_tipo: '',
+          parcela_num: 0,
+          parcela_total: 0,
+        })
+      }
+    },
+    onSaved: fetchList,
+  })
+  const { form, setForm, formOpen, saving, formError, toggleNew, openEdit, closeForm, submit } = crud
+
   /** Aplica filtros globais à lista. Lógica:
    *  - tipo: match exato se setado
    *  - pessoa: 'casal' = tudo; pessoa específica = individuais.dono=pessoa + todas conjuntas
@@ -92,15 +139,8 @@ export function DespesasPage({ competencia, filters }: Props) {
    *  ignora o argumento e devolve o mesmo share (ou null se ainda não chegou). */
   const weight = (r: LancamentoRow) => lancamentoWeight(r, filters.pessoa, filters.rateio, () => share)
 
-  function toggleNew() {
-    if (formOpen) { setFormOpen(false); setFormError(null); return }
-    setForm({ ...EMPTY_FORM, data: todayISO() })
-    setFormError(null)
-    setFormOpen(true)
-  }
-
-  function openEdit(r: LancamentoRow) {
-    setForm({
+  function editFromRow(r: LancamentoRow) {
+    openEdit({
       id: r.id,
       data: r.data,
       descricao: r.descricao,
@@ -115,80 +155,12 @@ export function DespesasPage({ competencia, filters }: Props) {
       edit_parcela_num: r.parcela_num || 0,
       edit_parcela_total: r.parcela_total || 0,
     })
-    setFormError(null)
-    setFormOpen(true)
   }
 
-  function closeForm() {
-    setFormOpen(false)
-    setFormError(null)
-  }
-
-  function validateForm(): string | null {
-    if (!form.data) return 'data obrigatória'
-    if (!form.descricao.trim()) return 'descrição obrigatória'
-    if (!form.categoria) return 'categoria obrigatória'
-    const v = parseBRL(form.valor)
-    if (!v || v <= 0) return 'valor inválido'
-    if (!form.pagador) return 'pagador obrigatório'
-    if (!form.tipo) return 'tipo obrigatório'
-    if (form.tipo === 'individual' && !form.dono) return 'dono obrigatório quando tipo=individual'
-    if (!form.id && form.repeticao === 'parcelado') {
-      if (!form.parcelas || form.parcelas < 2) return 'nº de parcelas deve ser >= 2'
-      if (form.parcelas > 60) return 'nº de parcelas muito alto (máx 60)'
-    }
-    return null
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    const err = validateForm()
-    if (err) { setFormError(err); return }
-    setSaving(true)
-    setFormError(null)
-    try {
-      const base = {
-        data: form.data,
-        descricao: form.descricao.trim(),
-        categoria: form.categoria,
-        valor: parseBRL(form.valor),
-        pagador: form.pagador as Pessoa,
-        tipo: form.tipo as 'individual' | 'conjunto',
-        dono: (form.tipo === 'individual' ? (form.dono as Pessoa) : '') as Pessoa | '',
-      }
-      if (form.id) {
-        // Edit: sempre uma linha por vez (mesmo se for parcela de série)
-        await lancamentos.update(form.id, {
-          ...base,
-          competencia: competenciaFromDate(form.data),
-        })
-      } else if (form.repeticao === 'parcelado') {
-        await createSerieParcelado(base, form.parcelas)
-      } else if (form.repeticao === 'recorrente') {
-        await createSerieRecorrente(base)
-      } else {
-        await lancamentos.create({
-          ...base,
-          competencia: competenciaFromDate(form.data),
-          serie_id: '',
-          serie_tipo: '',
-          parcela_num: 0,
-          parcela_total: 0,
-        })
-      }
-      closeForm()
-      fetchList()
-    } catch (err) {
-      setFormError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function remove(id: string) {
+  async function remove(r: LancamentoRow) {
     if (!confirm('Excluir esse lançamento?')) return
     try {
-      await lancamentos.remove(id)
+      await lancamentos.remove(r.id)
       fetchList()
     } catch (err) {
       alert('Erro ao excluir: ' + (err as Error).message)
@@ -392,41 +364,39 @@ export function DespesasPage({ competencia, filters }: Props) {
         </form>
       )}
 
-      {loading && <p className="muted">Carregando…</p>}
-      {error && <p className="error-msg">Erro: {error}</p>}
-      {!loading && !error && filtered.length === 0 && (
-        <p className="empty">Nenhum lançamento para {formatCompetenciaBR(competencia, 'long')}.</p>
-      )}
-
-      <ul className="rows">
-        {filtered.map((r) => (
-          <li key={r.id} className="row">
-            <button type="button" className="row-main" onClick={() => openEdit(r)}>
-              <div className="row-top">
-                <strong>
-                  {r.descricao}
-                  {r.serie_tipo === 'parcelado' && (
-                    <span className="badge" title={`Parcela ${r.parcela_num} de ${r.parcela_total}`}>
-                      {r.parcela_num}/{r.parcela_total}
-                    </span>
-                  )}
-                  {r.serie_tipo === 'recorrente' && (
-                    <span className="badge" title="Lançamento recorrente">↻</span>
-                  )}
-                </strong>
-                <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
-              </div>
-              <div className="row-meta">
-                <span>{formatDateBR(r.data)}</span>
-                <span>· {r.categoria}</span>
-                <span>· {r.tipo === 'conjunto' ? 'conjunta' : `${r.dono}`}</span>
-                <span>· pagou {r.pagador}</span>
-              </div>
-            </button>
-            <button type="button" className="row-del" onClick={() => remove(r.id)} aria-label="Excluir">×</button>
-          </li>
-        ))}
-      </ul>
+      <EntityList
+        loading={loading}
+        error={error}
+        emptyMsg={`Nenhum lançamento para ${formatCompetenciaBR(competencia, 'long')}.`}
+        items={filtered}
+        itemKey={(r) => r.id}
+        onEdit={editFromRow}
+        onDelete={remove}
+        renderRow={(r) => (
+          <>
+            <div className="row-top">
+              <strong>
+                {r.descricao}
+                {r.serie_tipo === 'parcelado' && (
+                  <span className="badge" title={`Parcela ${r.parcela_num} de ${r.parcela_total}`}>
+                    {r.parcela_num}/{r.parcela_total}
+                  </span>
+                )}
+                {r.serie_tipo === 'recorrente' && (
+                  <span className="badge" title="Lançamento recorrente">↻</span>
+                )}
+              </strong>
+              <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
+            </div>
+            <div className="row-meta">
+              <span>{formatDateBR(r.data)}</span>
+              <span>· {r.categoria}</span>
+              <span>· {r.tipo === 'conjunto' ? 'conjunta' : `${r.dono}`}</span>
+              <span>· pagou {r.pagador}</span>
+            </div>
+          </>
+        )}
+      />
     </section>
   )
 }
