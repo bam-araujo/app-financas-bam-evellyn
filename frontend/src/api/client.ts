@@ -102,6 +102,38 @@ export function deleteRow<T extends TableName>(table: T, id: string): Promise<{ 
   return apiPost<{ id: string; deleted: true }>('delete', { table, id })
 }
 
+// ====== Série (parcelado / recorrente) — só lancamentos ======================
+
+import type { LancamentoRow } from './types'
+
+export interface CreateSerieResult {
+  serie_id: string
+  count: number
+  rows: LancamentoRow[]
+}
+
+export function createSerieParcelado(
+  data: Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'competencia'>,
+  parcelas: number,
+): Promise<CreateSerieResult> {
+  return apiPost<CreateSerieResult>('create_serie', {
+    table: 'lancamentos',
+    serie_tipo: 'parcelado',
+    parcela_total: parcelas,
+    data,
+  })
+}
+
+export function createSerieRecorrente(
+  data: Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'competencia'>,
+): Promise<CreateSerieResult> {
+  return apiPost<CreateSerieResult>('create_serie', {
+    table: 'lancamentos',
+    serie_tipo: 'recorrente',
+    data,
+  })
+}
+
 // ====== helpers por tabela ===================================================
 
 function makeTableApi<T extends TableName>(table: T) {

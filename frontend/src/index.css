@@ -359,6 +359,27 @@ main {
 }
 .row-del:hover { background: rgba(185, 28, 28, 0.08); color: var(--danger); }
 
+.badge {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--row-hover);
+  color: var(--fg-muted);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.hint {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent);
+  border-radius: 0.5rem;
+  font-size: 0.825rem;
+}
+
 .empty {
   padding: 1.5rem;
   text-align: center;
