@@ -1,33 +1,38 @@
 :root {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Dueto — Tahoma como fonte da marca; fallbacks pra mobile (Android/iOS não
+     embarcam Tahoma; Verdana e Geneva são as mais próximas). */
+  font-family: Tahoma, Verdana, Geneva, sans-serif;
   color-scheme: light dark;
 
-  --bg: #f9fafb;
+  /* Paleta Dueto: laranja + preto */
+  --bg: #fafafa;
   --bg-card: #ffffff;
-  --fg: #111827;
-  --fg-muted: #6b7280;
-  --fg-light: #9ca3af;
-  --border: #e5e7eb;
-  --primary: #1f2937;
+  --fg: #0a0a0a;
+  --fg-muted: #525252;
+  --fg-light: #a3a3a3;
+  --border: #e5e5e5;
+  --primary: #0a0a0a;          /* preto pra botões primários */
   --primary-fg: #ffffff;
-  --accent: #2563eb;
+  --accent: #ea580c;           /* laranja-600 — links, focus rings, tab ativa */
+  --accent-soft: #f97316;      /* laranja-500 — fills de gráfico */
   --danger: #b91c1c;
-  --ok: #10b981;
+  --ok: #16a34a;
   --warn: #f59e0b;
-  --row-hover: #f3f4f6;
+  --row-hover: #f5f5f5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f172a;
-    --bg-card: #1e293b;
-    --fg: #f3f4f6;
-    --fg-muted: #9ca3af;
-    --fg-light: #6b7280;
-    --border: #334155;
-    --primary: #f3f4f6;
-    --primary-fg: #0f172a;
-    --row-hover: #1e293b;
+    --bg: #0a0a0a;
+    --bg-card: #171717;
+    --fg: #fafafa;
+    --fg-muted: #a3a3a3;
+    --fg-light: #525252;
+    --border: #262626;
+    --primary: #f97316;        /* laranja vira primário no dark — destaca */
+    --primary-fg: #0a0a0a;
+    --accent: #f97316;
+    --row-hover: #262626;
   }
 }
 

@@ -13,8 +13,8 @@ function initSchema() {
     }
     TABLES.forEach(function (t) { getOrCreateSheet_(t); });
 
-    seedRow_('pessoas', { nome: 'Bam' }, { nome: 'Bam', cor: '#2563eb' });
-    seedRow_('pessoas', { nome: 'Evellyn' }, { nome: 'Evellyn', cor: '#db2777' });
+    seedRow_('pessoas', { nome: 'Bam' }, { nome: 'Bam', cor: '#f97316' });
+    seedRow_('pessoas', { nome: 'Evellyn' }, { nome: 'Evellyn', cor: '#262626' });
 
     var cats = [
       { nome: 'Energia', grupo: 'despesa' },

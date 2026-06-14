@@ -41,7 +41,7 @@ export default function App() {
     <>
       <header className="app-header">
         <div className="app-header-row">
-          <h1>Finanças</h1>
+          <h1>Dueto</h1>
           <ConnDot status={conn} />
         </div>
         <CompetenciaSelector value={competencia} onChange={setCompetencia} />

@@ -28,7 +28,7 @@ for (const { src, out, size, padding = 0 } of sources) {
         width: size,
         height: size,
         channels: 4,
-        background: { r: 31, g: 41, b: 55, alpha: 1 }, // #1f2937
+        background: { r: 10, g: 10, b: 10, alpha: 1 }, // #0a0a0a — preto Dueto
       },
     })
       .composite([{ input: await sharp(svgBuf).resize(inner, inner).png().toBuffer(), top: offset, left: offset }])

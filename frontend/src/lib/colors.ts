@@ -1,16 +1,18 @@
 /**
- * Paleta pra gráficos. Cores de pessoa lidas da aba `pessoas` quando disponíveis;
- * paleta de categorias é fixa (suficiente pra ~14 categorias).
+ * Paleta pra gráficos — identidade visual Dueto: laranja + preto.
+ * Pessoas viram laranja vivo (Bam) e grafite (Evellyn) — contrastam bem
+ * em barras empilhadas e estão alinhadas com a marca.
  */
 
-export const COLOR_BAM = '#2563eb'      // azul (default — sobrepõe se pessoas tiver outra)
-export const COLOR_EVELLYN = '#db2777'  // rosa
+export const COLOR_BAM = '#f97316'      // laranja vivo (orange-500)
+export const COLOR_EVELLYN = '#262626'  // grafite (neutral-800)
 
-// Paleta categórica — escolhida pra contrastar entre si, OK em light/dark.
+// Paleta categórica — variedade necessária pra ~14 categorias. Mantém o laranja
+// como cor primária mas garante distinção visual entre fatias adjacentes.
 export const CATEGORY_PALETTE = [
-  '#2563eb', '#db2777', '#10b981', '#f59e0b', '#8b5cf6',
-  '#ef4444', '#14b8a6', '#f97316', '#06b6d4', '#a855f7',
-  '#84cc16', '#ec4899', '#0ea5e9', '#eab308', '#22c55e',
+  '#f97316', '#262626', '#fb923c', '#525252', '#ea580c',
+  '#737373', '#fdba74', '#404040', '#9a3412', '#171717',
+  '#fed7aa', '#a3a3a3', '#c2410c', '#0a0a0a', '#d4d4d4',
 ]
 
 export function colorForIndex(i: number): string {
