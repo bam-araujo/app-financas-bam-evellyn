@@ -201,9 +201,19 @@ export function DespesasPage({ competencia }: Props) {
             <span className="muted-light">(conjuntas {formatBRL(totalConjuntas)})</span>
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openNew}>
-          + Novo
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => { window.location.hash = '#/importar' }}
+            title="Importar fatura do cartão (PDF)"
+          >
+            Importar
+          </button>
+          <button type="button" className="btn btn-primary" onClick={openNew}>
+            + Novo
+          </button>
+        </div>
       </header>
 
       {formOpen && (

@@ -18,7 +18,6 @@ const TABS = [
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
   { key: 'acerto', label: 'Acerto' },
-  { key: 'importar', label: 'Importar' },
 ]
 
 export default function App() {

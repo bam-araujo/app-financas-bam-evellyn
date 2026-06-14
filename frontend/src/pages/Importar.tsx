@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { batchCreate, createSerieParcelado } from '../api/client'
+import { batchCreate, createSerieParcelado, createSerieRecorrente } from '../api/client'
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
@@ -15,8 +15,8 @@ type LineState = {
   tipo: 'individual' | 'conjunto'
   dono: '' | Pessoa
   // Repetição da linha (independente do que o parser detectou):
-  // 'unico' = cria 1 row na data; 'parcelado' = cria N rows mensais via createSerieParcelado.
-  repeticao: 'unico' | 'parcelado'
+  // 'unico' = cria 1 row; 'parcelado' = cria N rows mensais; 'recorrente' = 24 meses.
+  repeticao: 'unico' | 'parcelado' | 'recorrente'
   parcelas: number
   selected: boolean
   // info do parser, só pra contexto/badge
@@ -107,18 +107,22 @@ export function ImportarPage() {
     if (l.repeticao === 'parcelado' && (l.parcelas < 2 || l.parcelas > 60)) return false
     return true
   }
+  const anyRecorrente = lines.filter((l) => l.selected && l.repeticao === 'recorrente').length
   const allReady = selectedLines.length > 0 && selectedLines.every(lineReady)
 
   async function salvar() {
     setError(null)
     setPhase('saving')
     try {
-      // Separa em 2 grupos: únicos (batch) e parcelados (1 chamada per linha)
+      // Separa em 3 grupos: únicos (batch), parcelados (1 chamada/linha), recorrentes (1 chamada/linha)
       const unicos: { line: LineState; payload: CreatePayload<'lancamentos'> }[] = []
       const parcelados: LineState[] = []
+      const recorrentes: LineState[] = []
       for (const l of selectedLines) {
         if (l.repeticao === 'parcelado' && l.parcelas >= 2) {
           parcelados.push(l)
+        } else if (l.repeticao === 'recorrente') {
+          recorrentes.push(l)
         } else {
           unicos.push({
             line: l,
@@ -166,6 +170,23 @@ export function ImportarPage() {
         }
       }
 
+      for (const l of recorrentes) {
+        try {
+          const r = await createSerieRecorrente({
+            data: l.data,
+            descricao: l.descricao.trim(),
+            categoria: l.categoria,
+            valor: parseBRL(l.valor_input),
+            pagador: l.pagador,
+            tipo: l.tipo,
+            dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
+          })
+          ok += r.count
+        } catch (err) {
+          errs.push(`recorrente "${l.descricao}": ${(err as Error).message}`)
+        }
+      }
+
       setSaveResult({ ok, fail: errs.length, errors: errs.slice(0, 5) })
       setPhase('done')
     } catch (err) {
@@ -192,7 +213,20 @@ export function ImportarPage() {
             Sobe o PDF da fatura do cartão Itaú. Parser roda no celular — o arquivo não vai pro servidor.
           </p>
         </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => { window.location.hash = '#/despesas' }}
+        >
+          ← Despesas
+        </button>
       </header>
+
+      {anyRecorrente > 0 && (
+        <p className="hint">
+          {anyRecorrente} linha{anyRecorrente === 1 ? '' : 's'} marcada{anyRecorrente === 1 ? '' : 's'} como recorrente — cada uma vai gerar 24 lançamentos mensais.
+        </p>
+      )}
 
       {phase === 'idle' && (
         <div className="card">
@@ -342,11 +376,12 @@ export function ImportarPage() {
                   <div className="import-line">
                     <select
                       value={l.repeticao}
-                      onChange={(e) => update(i, { repeticao: e.target.value as 'unico' | 'parcelado' })}
+                      onChange={(e) => update(i, { repeticao: e.target.value as 'unico' | 'parcelado' | 'recorrente' })}
                       title="Repetição"
                     >
                       <option value="unico">Único</option>
                       <option value="parcelado">Parcelado</option>
+                      <option value="recorrente">Recorrente</option>
                     </select>
                     {l.repeticao === 'parcelado' && (
                       <input
@@ -358,6 +393,9 @@ export function ImportarPage() {
                         title="Nº de parcelas (cria N linhas mensais a partir desta data)"
                         className="parcelas"
                       />
+                    )}
+                    {l.repeticao === 'recorrente' && (
+                      <span className="muted-light" style={{ fontSize: '0.75rem' }}>24 meses</span>
                     )}
                     {l.parser_parcela_num && l.parser_parcela_total && (
                       <span className="muted-light" style={{ fontSize: '0.75rem' }}>
