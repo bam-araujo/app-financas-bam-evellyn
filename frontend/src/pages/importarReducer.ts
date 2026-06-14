@@ -31,7 +31,13 @@ export type LineState = {
 export type Phase = 'idle' | 'parsing' | 'review' | 'saving' | 'done'
 
 export interface SaveResult {
+  /** Lançamentos criados nesta fatura (1 por linha selecionada — não conta
+   *  parcelas futuras nem meses recorrentes que o backend materializa). */
   ok: number
+  /** Lançamentos adicionais criados pra parcelas futuras e meses recorrentes.
+   *  Mostrados separadamente pra não assustar com "24 lançamentos criados"
+   *  quando o user só importou 1 linha recorrente. */
+  extras: number
   fail: number
   errors: string[]
 }

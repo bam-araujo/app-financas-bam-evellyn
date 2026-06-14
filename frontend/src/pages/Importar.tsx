@@ -208,7 +208,12 @@ export function ImportarPage({ me }: Props) {
         }
       }
 
+      // `ok` = linhas desta fatura (1 por linha selecionada). `extras` =
+      // linhas adicionais que o backend materializa pra parcelas futuras
+      // e meses recorrentes — separadas pra UX não assustar com "24
+      // lançamentos criados" quando o user importou 1 recorrente.
       let ok = 0
+      let extras = 0
       const errs: string[] = []
 
       if (unicos.length) {
@@ -228,7 +233,8 @@ export function ImportarPage({ me }: Props) {
             tipo: l.tipo,
             dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
           }, l.parcelas)
-          ok += r.count
+          ok += 1
+          extras += Math.max(0, r.count - 1)
         } catch (err) {
           errs.push(`série "${l.descricao}": ${(err as Error).message}`)
         }
@@ -245,13 +251,14 @@ export function ImportarPage({ me }: Props) {
             tipo: l.tipo,
             dono: (l.tipo === 'individual' ? l.dono : '') as Pessoa | '',
           })
-          ok += r.count
+          ok += 1
+          extras += Math.max(0, r.count - 1)
         } catch (err) {
           errs.push(`recorrente "${l.descricao}": ${(err as Error).message}`)
         }
       }
 
-      dispatch({ type: 'SAVE_OK', result: { ok, fail: errs.length, errors: errs.slice(0, 5) } })
+      dispatch({ type: 'SAVE_OK', result: { ok, extras, fail: errs.length, errors: errs.slice(0, 5) } })
 
       // Registra mappings das linhas salvas pra próximas importações.
       // Dedupe em memória primeiro (mesma descricao+categoria não precisa
@@ -330,9 +337,14 @@ export function ImportarPage({ me }: Props) {
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Importação concluída</h3>
           <p>
-            <strong>{saveResult.ok}</strong> lançamento{saveResult.ok === 1 ? '' : 's'} criado{saveResult.ok === 1 ? '' : 's'}.
+            <strong>{saveResult.ok}</strong> lançamento{saveResult.ok === 1 ? '' : 's'} criado{saveResult.ok === 1 ? '' : 's'} nesta fatura.
             {saveResult.fail > 0 && <> <span className="error-msg" style={{ display: 'inline-block' }}>{saveResult.fail} falharam.</span></>}
           </p>
+          {saveResult.extras > 0 && (
+            <p className="muted-light" style={{ fontSize: '0.85rem', margin: '0.25rem 0 0.5rem' }}>
+              + {saveResult.extras} lançamento{saveResult.extras === 1 ? '' : 's'} agendado{saveResult.extras === 1 ? '' : 's'} pra meses seguintes (parcelas futuras + recorrências).
+            </p>
+          )}
           {saveResult.errors.length > 0 && (
             <ul>
               {saveResult.errors.map((e, idx) => <li key={idx}><code>{e}</code></li>)}
