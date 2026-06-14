@@ -30,6 +30,7 @@ export function ImportarPage() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [parsed, setParsed] = useState<ParsedFatura | null>(null)
+  const [rawLines, setRawLines] = useState<string[]>([])
   const [lines, setLines] = useState<LineState[]>([])
   const [saveResult, setSaveResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null)
 
@@ -47,6 +48,7 @@ export function ImportarPage() {
     setPhase('parsing')
     try {
       const linesText = await extractPdfLines(file)
+      setRawLines(linesText)
       const result = parseItauFatura(linesText)
       if (result.transactions.length === 0) {
         throw new Error('Nenhuma transação encontrada — o PDF parece não ser uma fatura Itaú.')
@@ -175,6 +177,7 @@ export function ImportarPage() {
   function reset() {
     setPhase('idle')
     setParsed(null)
+    setRawLines([])
     setLines([])
     setError(null)
     setSaveResult(null)
@@ -239,11 +242,31 @@ export function ImportarPage() {
                 <span className="muted-light"> (≠ total da fatura — confere)</span>
               )}
             </p>
-            <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
+            <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button type="button" className="btn" onClick={() => toggleAll(true)}>Selecionar todas</button>
               <button type="button" className="btn" onClick={() => toggleAll(false)}>Limpar seleção</button>
               <button type="button" className="btn" onClick={reset}>Trocar arquivo</button>
             </div>
+            {rawLines.length > 0 && (
+              <details style={{ marginTop: '0.75rem' }}>
+                <summary className="muted" style={{ cursor: 'pointer', fontSize: '0.825rem' }}>
+                  Ver texto bruto extraído ({rawLines.length} linhas) — útil pra reportar problema de parser
+                </summary>
+                <pre style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  background: 'var(--row-hover)',
+                  borderRadius: '0.4rem',
+                  fontSize: '0.75rem',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: '20rem',
+                  overflowY: 'auto',
+                }}>
+                  {rawLines.map((l, i) => `${String(i + 1).padStart(3, ' ')}: ${l}`).join('\n')}
+                </pre>
+              </details>
+            )}
           </div>
 
           <ul className="rows import-rows">
