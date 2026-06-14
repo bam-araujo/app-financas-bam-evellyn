@@ -53,13 +53,18 @@ function verifyIdToken_(idToken) {
   catch (_) { throw new Error('id_token_unparseable'); }
 
   // Checagens mínimas. tokeninfo já valida signature + expiry; aqui só
-  // confirmamos os campos críticos.
+  // confirmamos os campos críticos. Fail-closed: qualquer ausência rejeita.
   var expectedAud = getExpectedAudience_();
-  if (expectedAud && info.aud !== expectedAud) {
+  if (!expectedAud) {
+    // Sem client_id configurado, recusa tudo — evita bypass silencioso se
+    // a Property OAUTH_CLIENT_ID for esquecida em alguma implantação nova.
+    throw new Error('oauth_client_id_not_configured');
+  }
+  if (info.aud !== expectedAud) {
     throw new Error('id_token_wrong_audience');
   }
-  if (info.exp && Number(info.exp) * 1000 < Date.now()) {
-    throw new Error('id_token_expired');
+  if (!info.exp || Number(info.exp) * 1000 < Date.now()) {
+    throw new Error('id_token_expired_or_missing_exp');
   }
   if (!info.email_verified || info.email_verified === 'false') {
     throw new Error('id_token_email_unverified');
