@@ -48,7 +48,6 @@ export const BANKS: Record<Bank, BankInfo> = {
     detect: (lines) =>
       lines.some((l) => /\bnubank\b|nu\s+pagamentos|nupay/i.test(l.text)),
     parse: parseNubankFatura,
-    pending: true,
   },
   santander: {
     id: 'santander',
@@ -63,7 +62,6 @@ export const BANKS: Record<Bank, BankInfo> = {
     detect: (lines) =>
       lines.some((l) => /mercado\s*pago|mercadopago/i.test(l.text)),
     parse: parseMercadoPagoFatura,
-    pending: true,
   },
 }
 

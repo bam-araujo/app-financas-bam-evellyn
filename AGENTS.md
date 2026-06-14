@@ -124,9 +124,9 @@ frontend/
         registry.ts               # ◆ BANKS map + detectBank + parseFatura (dispatcher por banco)
         pdf-extract.ts            # pdf.js wrapper (banco-agnóstico, extrai texto + X/Y)
         itau-fatura.ts            # parser Itaú PDF (implementado)
-        nubank-fatura.ts          # STUB — precisa de samples/nubank-*.pdf
+        nubank-fatura.ts          # parser Nubank PDF (implementado, calibrado com samples/nubank-2026-05.pdf)
         santander-fatura.ts       # STUB — precisa de samples/santander-*.pdf
-        mercadopago-fatura.ts     # STUB — precisa de samples/mercadopago-*.pdf
+        mercadopago-fatura.ts     # parser Mercado Pago PDF (implementado, calibrado com samples/mercadopago-2026-05.pdf)
     pages/
       Acerto.tsx                  # acerto + marcar pago (acertos_pagos)
       Dashboard.tsx               # Home: progressive load (lists → shares background)
