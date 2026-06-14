@@ -313,6 +313,10 @@ Funções com `_` no início ficam escondidas do dropdown de Execução do edito
 
 ---
 
+## Backlog / próximos passos
+
+Roadmap de produto priorizado vive em [docs/BACKLOG.md](docs/BACKLOG.md). Tiers S → C, cada item com estimativa, critério de aceite e dicas de implementação apontando arquivos existentes. **Pegue de lá** antes de propor coisa nova — o usuário já tomou decisão sobre o que está e o que não está em scope.
+
 ## Histórico
 
 - **PRs originais (1–7):** ver [PRs-app-financas.md](PRs-app-financas.md) — todos entregues.
