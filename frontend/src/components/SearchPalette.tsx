@@ -18,8 +18,10 @@ import { formatBRL, formatDateBR } from '../lib/format'
  * categoria, origem, instituicao, ativo. Volume é baixo (2 usuários) —
  * baixa tudo no open e indexa em memória; sem paginação no backend.
  *
- * Resultado clicado: navega via window.location.hash pra página apropriada.
- * Pode evoluir pra abrir o form em edit direto, mas hash é mais simples.
+ * Resultado clicado: chama `onNavigate(route, competencia)` — o pai (App)
+ * atualiza a competência ANTES de mudar de rota pra garantir que a tela
+ * destino renderize com o mês certo do item clicado (e não com o mês
+ * que estava selecionado antes).
  */
 
 interface IndexedRow {
@@ -30,6 +32,7 @@ interface IndexedRow {
   subtitle: string
   valor: string
   route: string
+  competencia: string  // YYYY-MM pra setar no header ao navegar
 }
 
 function buildIndex(
@@ -40,6 +43,7 @@ function buildIndex(
 ): IndexedRow[] {
   const out: IndexedRow[] = []
   for (const l of lncs) {
+    const comp = l.competencia || (l.data || '').slice(0, 7)
     out.push({
       kind: 'lancamento',
       id: l.id,
@@ -48,6 +52,7 @@ function buildIndex(
       subtitle: `${formatDateBR(l.data)} · ${l.categoria} · ${l.tipo === 'conjunto' ? 'conjunta' : l.dono}`,
       valor: formatBRL(Number(l.valor) || 0),
       route: '#/despesas',
+      competencia: comp,
     })
   }
   for (const r of rcts) {
@@ -59,6 +64,7 @@ function buildIndex(
       subtitle: `${r.competencia}${r.origem ? ' · ' + r.origem : ''}`,
       valor: formatBRL(Number(r.valor) || 0),
       route: '#/receitas',
+      competencia: r.competencia,
     })
   }
   for (const s of sals) {
@@ -70,6 +76,7 @@ function buildIndex(
       subtitle: `${formatDateBR(s.data)} · saldo · ${s.titular}`,
       valor: formatBRL(Number(s.valor_saldo) || 0),
       route: '#/investimentos',
+      competencia: (s.data || '').slice(0, 7),
     })
   }
   for (const m of movs) {
@@ -81,6 +88,7 @@ function buildIndex(
       subtitle: `${formatDateBR(m.data)} · ${m.instituicao} · ${m.titular}`,
       valor: formatBRL(Number(m.valor) || 0),
       route: '#/investimentos',
+      competencia: (m.data || '').slice(0, 7),
     })
   }
   return out
@@ -89,9 +97,16 @@ function buildIndex(
 interface Props {
   open: boolean
   onClose: () => void
+  /**
+   * Chamado quando o usuário escolhe um resultado. O pai deve atualizar
+   * a competência E mudar a rota. Hash sozinho não basta porque a
+   * competência é estado do App (sticky no header), e a página destino
+   * filtra por essa competência — se não atualizar, o item não aparece.
+   */
+  onNavigate: (route: string, competencia: string) => void
 }
 
-export function SearchPalette({ open, onClose }: Props) {
+export function SearchPalette({ open, onClose, onNavigate }: Props) {
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState<IndexedRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -133,7 +148,8 @@ export function SearchPalette({ open, onClose }: Props) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(c + 1, results.length - 1)); return }
     if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); return }
     if (e.key === 'Enter' && results[cursor]) {
-      window.location.hash = results[cursor].route
+      const r = results[cursor]
+      onNavigate(r.route, r.competencia)
       onClose()
     }
   }
@@ -168,7 +184,7 @@ export function SearchPalette({ open, onClose }: Props) {
               <li
                 key={`${row.kind}:${row.id}`}
                 className={'search-row' + (i === cursor ? ' active' : '')}
-                onClick={() => { window.location.hash = row.route; onClose() }}
+                onClick={() => { onNavigate(row.route, row.competencia); onClose() }}
                 onMouseEnter={() => setCursor(i)}
               >
                 <div className="search-row-main">

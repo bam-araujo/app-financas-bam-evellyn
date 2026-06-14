@@ -174,7 +174,15 @@ export default function App() {
         )}
       </main>
 
-      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchPalette
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={(route, comp) => {
+          // Competência primeiro: a página destino lê via prop e filtra por ela.
+          if (comp && /^\d{4}-\d{2}$/.test(comp)) setCompetencia(comp)
+          window.location.hash = route
+        }}
+      />
     </>
   )
 }
