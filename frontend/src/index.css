@@ -79,6 +79,19 @@ main {
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--accent);
+  line-height: 1;
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+.brand .tagline {
+  font-size: 0.625rem;
+  color: var(--fg-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
 .competencia {

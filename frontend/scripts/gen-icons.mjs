@@ -11,7 +11,9 @@ const publicDir = join(here, '..', 'public')
 const sources = [
   { src: 'icon-192.svg', out: 'icon-192.png', size: 192 },
   { src: 'icon-512.svg', out: 'icon-512.png', size: 512 },
-  { src: 'icon-512.svg', out: 'icon-maskable-512.png', size: 512, padding: 0.1 },
+  // Maskable usa o mark sem texto pra a tagline não ser cortada quando o
+  // launcher recortar circular/oval.
+  { src: 'icon-mark.svg', out: 'icon-maskable-512.png', size: 512, padding: 0.1 },
 ]
 
 for (const { src, out, size, padding = 0 } of sources) {

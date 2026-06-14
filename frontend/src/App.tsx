@@ -41,7 +41,10 @@ export default function App() {
     <>
       <header className="app-header">
         <div className="app-header-row">
-          <h1>Dueto</h1>
+          <div className="brand">
+            <h1>Dueto</h1>
+            <span className="tagline">app de finanças</span>
+          </div>
           <ConnDot status={conn} />
         </div>
         <CompetenciaSelector value={competencia} onChange={setCompetencia} />
