@@ -159,7 +159,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         })
         if (scope === null) throw new Error('cancelado')
         const payload = { ...base, competencia: competenciaFromDate(form.data) }
-        await updateSerieForward(form.id, scope, payload)
+        await updateSerieForward('lancamentos', form.id, scope, payload)
       } else if (form.id && form.edit_serie_tipo) {
         // CONVERSÃO série → outro tipo (única / outra série).
         // Apaga essa linha e as futuras da série; passadas ficam preservadas
@@ -182,7 +182,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
           ],
         })
         if (confirmed === null) throw new Error('cancelado')
-        await deleteSerieForward(form.id, 'forward')
+        await deleteSerieForward('lancamentos', form.id, 'forward')
         if (form.repeticao === 'unico') {
           await lancamentos.create({
             ...base,
@@ -193,9 +193,9 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             parcela_total: 0,
           })
         } else if (form.repeticao === 'parcelado') {
-          await createSerieParcelado(base, form.parcelas)
+          await createSerieParcelado('lancamentos', base, form.parcelas)
         } else {
-          await createSerieRecorrente(base)
+          await createSerieRecorrente('lancamentos', base)
         }
       } else if (form.id && form.repeticao !== 'unico') {
         // CONVERSÃO standalone → série (única → parcelado/recorrente).
@@ -215,17 +215,17 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         if (confirmed === null) throw new Error('cancelado')
         await lancamentos.remove(form.id)
         if (form.repeticao === 'parcelado') {
-          await createSerieParcelado(base, form.parcelas)
+          await createSerieParcelado('lancamentos', base, form.parcelas)
         } else {
-          await createSerieRecorrente(base)
+          await createSerieRecorrente('lancamentos', base)
         }
       } else if (form.id) {
         // Edit linha standalone, sem conversão.
         await lancamentos.update(form.id, { ...base, competencia: competenciaFromDate(form.data) })
       } else if (form.repeticao === 'parcelado') {
-        await createSerieParcelado(base, form.parcelas)
+        await createSerieParcelado('lancamentos', base, form.parcelas)
       } else if (form.repeticao === 'recorrente') {
-        await createSerieRecorrente(base)
+        await createSerieRecorrente('lancamentos', base)
       } else {
         await lancamentos.create({
           ...base,
@@ -314,7 +314,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
       })
       if (scope === null) return
       try {
-        await deleteSerieForward(r.id, scope)
+        await deleteSerieForward('lancamentos', r.id, scope)
         fetchList()
       } catch (err) {
         alert('Erro ao excluir: ' + (err as Error).message)

@@ -165,39 +165,52 @@ export function deleteRow<T extends TableName>(table: T, id: string): Promise<{ 
   return apiPost<{ id: string; deleted: true }>('delete', { table, id })
 }
 
-// ====== Série (parcelado / recorrente) — só lancamentos ======================
+// ====== Série (parcelado / recorrente) — lancamentos + receitas =============
 
-import type { LancamentoRow } from './types'
+import type { LancamentoRow, ReceitaRow } from './types'
 
-export interface CreateSerieResult {
+/** Tabelas que suportam série. Espelha SERIE_TABLES em backend/05_Series.gs. */
+export type SerieTable = 'lancamentos' | 'receitas'
+
+type SerieRowMap = { lancamentos: LancamentoRow; receitas: ReceitaRow }
+
+type SerieBase<T extends SerieTable> = Omit<
+  SerieRowMap[T],
+  'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'competencia'
+>
+
+export interface CreateSerieResult<T extends SerieTable = 'lancamentos'> {
   serie_id: string
   count: number
-  rows: LancamentoRow[]
+  rows: SerieRowMap[T][]
 }
 
-export function createSerieParcelado(
-  data: Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'competencia'>,
+export function createSerieParcelado<T extends SerieTable>(
+  table: T,
+  data: SerieBase<T>,
   parcelas: number,
-): Promise<CreateSerieResult> {
-  return apiPost<CreateSerieResult>('create_serie', {
-    table: 'lancamentos',
+): Promise<CreateSerieResult<T>> {
+  return apiPost<CreateSerieResult<T>>('create_serie', {
+    table,
     serie_tipo: 'parcelado',
     parcela_total: parcelas,
     data,
   })
 }
 
-export function createSerieRecorrente(
-  data: Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'competencia'>,
-): Promise<CreateSerieResult> {
-  return apiPost<CreateSerieResult>('create_serie', {
-    table: 'lancamentos',
+export function createSerieRecorrente<T extends SerieTable>(
+  table: T,
+  data: SerieBase<T>,
+): Promise<CreateSerieResult<T>> {
+  return apiPost<CreateSerieResult<T>>('create_serie', {
+    table,
     serie_tipo: 'recorrente',
     data,
   })
 }
 
-/** Estende séries recorrentes até cobrir `throughCompetencia` + 12 meses. Idempotente. */
+/** Estende séries recorrentes (de TODAS as tabelas suportadas) até cobrir
+ *  `throughCompetencia` + 12 meses. Idempotente. */
 export function extendRecorrentes(throughCompetencia: string): Promise<{ extended: number; through: string }> {
   return apiPost<{ extended: number; through: string }>('extend_recorrentes', {
     through_competencia: throughCompetencia,
@@ -207,9 +220,13 @@ export function extendRecorrentes(throughCompetencia: string): Promise<{ extende
 export type SerieScope = 'this' | 'forward'
 
 /** Delete uma linha ('this') ou linha + futuras da mesma série ('forward'). */
-export function deleteSerieForward(id: string, scope: SerieScope): Promise<{ id: string; deleted: number; serie_id?: string }> {
+export function deleteSerieForward(
+  table: SerieTable,
+  id: string,
+  scope: SerieScope,
+): Promise<{ id: string; deleted: number; serie_id?: string }> {
   return apiPost<{ id: string; deleted: number; serie_id?: string }>('delete_serie_forward', {
-    table: 'lancamentos',
+    table,
     id,
     scope,
   })
@@ -217,16 +234,17 @@ export function deleteSerieForward(id: string, scope: SerieScope): Promise<{ id:
 
 /**
  * Update uma linha ('this') ou propaga campos pra linha + futuras ('forward').
- * Em 'forward', só descricao/categoria/valor/pagador/tipo/dono propagam — data
- * e competencia ficam por linha.
+ * Em 'forward', só os campos propagáveis da tabela atravessam — âncora
+ * (data/competencia) sempre fica por linha. Lista em backend/05_Series.gs.
  */
-export function updateSerieForward(
+export function updateSerieForward<T extends SerieTable>(
+  table: T,
   id: string,
   scope: SerieScope,
-  fields: Partial<Omit<LancamentoRow, 'id' | 'serie_id' | 'serie_tipo' | 'parcela_num' | 'parcela_total' | 'data' | 'competencia'>>,
+  fields: Partial<SerieBase<T>>,
 ): Promise<{ id: string; updated?: number; serie_id?: string }> {
   return apiPost('update_serie_forward', {
-    table: 'lancamentos',
+    table,
     id,
     scope,
     fields,

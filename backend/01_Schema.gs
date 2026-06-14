@@ -98,7 +98,12 @@ const SCHEMA = {
     },
   },
   receitas: {
-    columns: ['id', 'competencia', 'pessoa', 'tipo', 'origem', 'valor', 'conta_para_share'],
+    columns: [
+      'id', 'competencia', 'pessoa', 'tipo', 'origem', 'valor', 'conta_para_share',
+      // Série (parcelado ou recorrente). Standalone = todos vazios/0.
+      // Ancora em competencia (não há campo data — receita é mensal).
+      'serie_id', 'serie_tipo', 'parcela_num', 'parcela_total',
+    ],
     required: ['competencia', 'pessoa', 'tipo', 'valor'],
     validators: {
       competencia: V.month,
@@ -107,6 +112,15 @@ const SCHEMA = {
       origem: V.stringOptional,
       valor: V.number,
       conta_para_share: V.bool,
+      serie_id: V.stringOptional,
+      serie_tipo: function (v) {
+        if (v === null || v === undefined || v === '') return '';
+        var s = String(v);
+        if (['parcelado', 'recorrente'].indexOf(s) === -1) throw new Error('serie_tipo_invalido');
+        return s;
+      },
+      parcela_num: V.numberOptional,
+      parcela_total: V.numberOptional,
     },
     defaults: { conta_para_share: true },
   },

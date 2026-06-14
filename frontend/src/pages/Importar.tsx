@@ -181,7 +181,7 @@ export function ImportarPage({ me }: Props) {
 
       for (const l of parcelados) {
         try {
-          const r = await createSerieParcelado({
+          const r = await createSerieParcelado('lancamentos', {
             data: l.data,
             descricao: l.descricao.trim(),
             categoria: l.categoria,
@@ -198,7 +198,7 @@ export function ImportarPage({ me }: Props) {
 
       for (const l of recorrentes) {
         try {
-          const r = await createSerieRecorrente({
+          const r = await createSerieRecorrente('lancamentos', {
             data: l.data,
             descricao: l.descricao.trim(),
             categoria: l.categoria,

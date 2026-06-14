@@ -20,6 +20,8 @@ export interface CategoriaRow extends RowBase {
   grupo: 'despesa' | 'receita'
 }
 
+export type SerieTipo = 'parcelado' | 'recorrente' | ''
+
 export interface ReceitaRow extends RowBase {
   competencia: string          // YYYY-MM
   pessoa: Pessoa
@@ -27,9 +29,13 @@ export interface ReceitaRow extends RowBase {
   origem: string
   valor: number
   conta_para_share: boolean
+  // Série (parcelado ou recorrente). Standalone = todos vazios/0.
+  // Receita ancora em competencia (não tem data).
+  serie_id: string
+  serie_tipo: SerieTipo
+  parcela_num: number
+  parcela_total: number
 }
-
-export type SerieTipo = 'parcelado' | 'recorrente' | ''
 
 export interface LancamentoRow extends RowBase {
   data: string                 // YYYY-MM-DD
