@@ -193,6 +193,33 @@ const SCHEMA = {
       fechado_em: V.stringOptional,
     },
   },
+  // Acertos efetivamente pagos entre o casal. Subtraídos do saldo
+  // calculado no Acerto pra zerar quando alguém quita o que devia.
+  acertos_pagos: {
+    columns: ['id', 'data', 'competencia', 'de', 'para', 'valor', 'descricao'],
+    required: ['data', 'de', 'para', 'valor'],
+    validators: {
+      data: V.date,
+      competencia: V.monthOptional,
+      de: V.enum(PESSOAS_VALIDAS),
+      para: V.enum(PESSOAS_VALIDAS),
+      valor: V.number,
+      descricao: V.stringOptional,
+    },
+    derive: function (row) {
+      if ((!row.competencia || row.competencia === '') && row.data) {
+        row.competencia = String(row.data).slice(0, 7);
+      }
+    },
+    crossValidate: function (row) {
+      if (row.de === row.para) {
+        throw new Error('de_e_para_devem_ser_diferentes');
+      }
+      if (Number(row.valor) <= 0) {
+        throw new Error('valor_deve_ser_positivo');
+      }
+    },
+  },
 };
 
 const TABLES = Object.keys(SCHEMA);

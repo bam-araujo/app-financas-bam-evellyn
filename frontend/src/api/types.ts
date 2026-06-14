@@ -72,6 +72,15 @@ export interface ShareData {
   Evellyn: number
 }
 
+export interface AcertoPagoRow extends RowBase {
+  data: string                 // YYYY-MM-DD
+  competencia: string          // YYYY-MM (derivada se ausente)
+  de: Pessoa                   // quem pagou
+  para: Pessoa                 // quem recebeu
+  valor: number
+  descricao: string
+}
+
 export interface TableMap {
   pessoas: PessoaRow
   categorias: CategoriaRow
@@ -79,6 +88,7 @@ export interface TableMap {
   lancamentos: LancamentoRow
   investimentos_saldos: InvestimentoSaldoRow
   investimentos_movimentos: InvestimentoMovimentoRow
+  acertos_pagos: AcertoPagoRow
 }
 
 export type TableName = keyof TableMap

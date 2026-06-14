@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { closeShare, getShare, lancamentos, reopenShare } from '../api/client'
-import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
-import { formatBRL, formatCompetenciaBR } from '../lib/format'
+import { acertosPagos, closeShare, getShare, lancamentos, reopenShare } from '../api/client'
+import type { AcertoPagoRow, LancamentoRow, Pessoa, ShareData } from '../api/types'
+import { todayISO } from '../lib/competencia'
+import { formatBRL, formatCompetenciaBR, formatDateBR } from '../lib/format'
 
 interface Props {
   competencia: string
 }
 
-/** Arredonda pra 2 casas. */
 function r2(n: number): number {
   return Math.round(n * 100) / 100
 }
@@ -42,6 +42,7 @@ function calcularRateios(rows: LancamentoRow[], share: ShareData): RowRateio[] {
 export function AcertoPage({ competencia }: Props) {
   const [share, setShare] = useState<ShareData | null>(null)
   const [rows, setRows] = useState<LancamentoRow[]>([])
+  const [pagos, setPagos] = useState<AcertoPagoRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
@@ -52,11 +53,14 @@ export function AcertoPage({ competencia }: Props) {
     Promise.all([
       getShare(competencia),
       lancamentos.list({ competencia, tipo: 'conjunto' }),
+      acertosPagos.list({ competencia }),
     ])
-      .then(([s, ls]) => {
+      .then(([s, ls, ps]) => {
         setShare(s)
         ls.sort((a, b) => (b.data || '').localeCompare(a.data || ''))
         setRows(ls)
+        ps.sort((a, b) => (b.data || '').localeCompare(a.data || ''))
+        setPagos(ps)
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
@@ -72,6 +76,18 @@ export function AcertoPage({ competencia }: Props) {
     return calcularRateios(rows, share)
   }, [rows, share])
 
+  /** Total já quitado por sentido (de→para). Subtraído do saldo calculado. */
+  const liquidados = useMemo(() => {
+    let bamPagouParaEvellyn = 0
+    let evellynPagouParaBam = 0
+    for (const p of pagos) {
+      const v = Number(p.valor) || 0
+      if (p.de === 'Bam' && p.para === 'Evellyn') bamPagouParaEvellyn += v
+      else if (p.de === 'Evellyn' && p.para === 'Bam') evellynPagouParaBam += v
+    }
+    return { bamPagouParaEvellyn: r2(bamPagouParaEvellyn), evellynPagouParaBam: r2(evellynPagouParaBam) }
+  }, [pagos])
+
   const totais = useMemo(() => {
     const pago = { Bam: 0, Evellyn: 0 }
     const devido = { Bam: 0, Evellyn: 0 }
@@ -80,16 +96,23 @@ export function AcertoPage({ competencia }: Props) {
       devido.Bam += d.Bam
       devido.Evellyn += d.Evellyn
     }
-    const saldo = {
+    // saldo bruto = pago - devido. Acertos pagos zeram a parcela quitada:
+    // Bam pagou pra Evellyn (sentido B→E) → reduz crédito de Bam, reduz dívida de Evellyn.
+    const saldoBruto = {
       Bam: r2(pago.Bam - devido.Bam),
       Evellyn: r2(pago.Evellyn - devido.Evellyn),
+    }
+    const saldo = {
+      Bam: r2(saldoBruto.Bam - liquidados.bamPagouParaEvellyn + liquidados.evellynPagouParaBam),
+      Evellyn: r2(saldoBruto.Evellyn - liquidados.evellynPagouParaBam + liquidados.bamPagouParaEvellyn),
     }
     return {
       pago: { Bam: r2(pago.Bam), Evellyn: r2(pago.Evellyn) },
       devido: { Bam: r2(devido.Bam), Evellyn: r2(devido.Evellyn) },
+      saldoBruto,
       saldo,
     }
-  }, [rateios])
+  }, [rateios, liquidados])
 
   async function fechar() {
     if (!confirm('Fechar o mês ' + formatCompetenciaBR(competencia, 'long') + '? O share não vai mais recalcular se você inserir/editar receitas depois.')) return
@@ -118,10 +141,53 @@ export function AcertoPage({ competencia }: Props) {
     }
   }
 
-  // Frase do saldo líquido
+  // Frase do saldo líquido (após liquidações)
   const credor: Pessoa | null = totais.saldo.Bam > 0 ? 'Bam' : totais.saldo.Evellyn > 0 ? 'Evellyn' : null
   const valorAcerto = credor ? Math.abs(totais.saldo[credor]) : 0
   const devedor: Pessoa | null = credor === 'Bam' ? 'Evellyn' : credor === 'Evellyn' ? 'Bam' : null
+
+  async function marcarPago() {
+    if (!credor || !devedor || valorAcerto <= 0) return
+    const valorStr = prompt(
+      `Confirmar pagamento de ${devedor} → ${credor}\nValor sugerido: ${formatBRL(valorAcerto)}\n\nValor pago (deixe em branco para usar o sugerido):`,
+      '',
+    )
+    if (valorStr === null) return // cancel
+    const valor = valorStr.trim() === '' ? valorAcerto : Number(valorStr.replace(',', '.'))
+    if (!isFinite(valor) || valor <= 0) {
+      alert('Valor inválido.')
+      return
+    }
+    setWorking(true)
+    try {
+      await acertosPagos.create({
+        data: todayISO(),
+        competencia,
+        de: devedor,
+        para: credor,
+        valor,
+        descricao: `Acerto de ${formatCompetenciaBR(competencia, 'long')}`,
+      })
+      fetchAll()
+    } catch (err) {
+      alert('Erro: ' + (err as Error).message)
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function removerPago(p: AcertoPagoRow) {
+    if (!confirm(`Remover o pagamento de ${formatBRL(Number(p.valor) || 0)} (${p.de} → ${p.para}) em ${formatDateBR(p.data)}?`)) return
+    setWorking(true)
+    try {
+      await acertosPagos.remove(p.id)
+      fetchAll()
+    } catch (err) {
+      alert('Erro: ' + (err as Error).message)
+    } finally {
+      setWorking(false)
+    }
+  }
 
   return (
     <section>
@@ -155,14 +221,21 @@ export function AcertoPage({ competencia }: Props) {
       {share && (
         <div className="card resumo">
           {credor && devedor && valorAcerto > 0 ? (
-            <p className="acerto-final">
-              <strong>{devedor}</strong> deve{' '}
-              <strong className="row-valor">{formatBRL(valorAcerto)}</strong> para{' '}
-              <strong>{credor}</strong>.
-            </p>
+            <>
+              <p className="acerto-final">
+                <strong>{devedor}</strong> deve{' '}
+                <strong className="row-valor">{formatBRL(valorAcerto)}</strong> para{' '}
+                <strong>{credor}</strong>.
+              </p>
+              <div className="form-actions" style={{ justifyContent: 'flex-start' }}>
+                <button type="button" className="btn btn-primary" disabled={working} onClick={marcarPago}>
+                  {working ? '…' : 'Marcar como pago'}
+                </button>
+              </div>
+            </>
           ) : (
             <p className="acerto-final muted">
-              {rows.length === 0
+              {rows.length === 0 && pagos.length === 0
                 ? 'Nada a acertar — sem despesas conjuntas neste mês.'
                 : 'Saldo zerado neste mês.'}
             </p>
@@ -186,30 +259,74 @@ export function AcertoPage({ competencia }: Props) {
               <strong className={totais.saldo.Evellyn >= 0 ? 'pos' : 'neg'}>{formatBRL(totais.saldo.Evellyn)}</strong>
             </div>
           </div>
+          {(liquidados.bamPagouParaEvellyn > 0 || liquidados.evellynPagouParaBam > 0) && (
+            <p className="muted-light" style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>
+              {liquidados.bamPagouParaEvellyn > 0 && (
+                <>Bam→Evellyn já pago: {formatBRL(liquidados.bamPagouParaEvellyn)}. </>
+              )}
+              {liquidados.evellynPagouParaBam > 0 && (
+                <>Evellyn→Bam já pago: {formatBRL(liquidados.evellynPagouParaBam)}.</>
+              )}
+            </p>
+          )}
         </div>
       )}
 
-      {!loading && rateios.length === 0 && (
+      {!loading && rateios.length === 0 && pagos.length === 0 && (
         <p className="empty">Sem despesas conjuntas em {formatCompetenciaBR(competencia, 'long')}.</p>
       )}
 
-      <ul className="rows">
-        {rateios.map(({ row, devido }) => (
-          <li key={row.id} className="row">
-            <div className="row-main">
-              <div className="row-top">
-                <strong>{row.descricao}</strong>
-                <span className="row-valor">{formatBRL(Number(row.valor) || 0)}</span>
-              </div>
-              <div className="row-meta">
-                <span>pagou {row.pagador}</span>
-                <span>· Bam {formatBRL(devido.Bam)}</span>
-                <span>· Evellyn {formatBRL(devido.Evellyn)}</span>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {rateios.length > 0 && (
+        <>
+          <h3 style={{ marginBottom: '0.5rem' }}>Despesas conjuntas</h3>
+          <ul className="rows">
+            {rateios.map(({ row, devido }) => (
+              <li key={row.id} className="row">
+                <div className="row-main">
+                  <div className="row-top">
+                    <strong>{row.descricao}</strong>
+                    <span className="row-valor">{formatBRL(Number(row.valor) || 0)}</span>
+                  </div>
+                  <div className="row-meta">
+                    <span>pagou {row.pagador}</span>
+                    <span>· Bam {formatBRL(devido.Bam)}</span>
+                    <span>· Evellyn {formatBRL(devido.Evellyn)}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {pagos.length > 0 && (
+        <>
+          <h3 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Pagamentos registrados</h3>
+          <ul className="rows">
+            {pagos.map((p) => (
+              <li key={p.id} className="row">
+                <div className="row-main">
+                  <div className="row-top">
+                    <strong>{p.de} → {p.para}</strong>
+                    <span className="row-valor pos">{formatBRL(Number(p.valor) || 0)}</span>
+                  </div>
+                  <div className="row-meta">
+                    <span>{formatDateBR(p.data)}</span>
+                    {p.descricao && <span>· {p.descricao}</span>}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="row-del"
+                  onClick={() => removerPago(p)}
+                  aria-label="Remover pagamento"
+                  disabled={working}
+                >×</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   )
 }
