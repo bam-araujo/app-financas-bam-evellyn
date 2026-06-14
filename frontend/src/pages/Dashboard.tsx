@@ -12,8 +12,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { getShare, lancamentos, receitas } from '../api/client'
-import type { LancamentoRow, ReceitaRow, ShareData } from '../api/types'
+import { getShare, investimentosMovimentos, lancamentos, receitas } from '../api/client'
+import type { InvestimentoMovimentoRow, LancamentoRow, ReceitaRow, ShareData } from '../api/types'
 import type { GlobalFilters } from '../components/Filters'
 import { COLOR_BAM, COLOR_EVELLYN, colorForIndex } from '../lib/colors'
 import { shiftCompetencia } from '../lib/competencia'
@@ -53,6 +53,7 @@ function listMonthsInRange(start: string, end: string): string[] {
 export function DashboardPage({ competencia, filters }: Props) {
   const [allLanc, setAllLanc] = useState<LancamentoRow[]>([])
   const [allRec, setAllRec] = useState<ReceitaRow[]>([])
+  const [allInv, setAllInv] = useState<InvestimentoMovimentoRow[]>([])
   const [shares, setShares] = useState<Record<string, ShareData>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,11 +69,15 @@ export function DashboardPage({ competencia, filters }: Props) {
   function reload() {
     setLoading(true)
     setError(null)
-    Promise.all([lancamentos.list(), receitas.list()])
-      .then(async ([ls, rs]) => {
+    Promise.all([
+      lancamentos.list(),
+      receitas.list(),
+      investimentosMovimentos.list().catch(() => []),
+    ])
+      .then(async ([ls, rs, invs]) => {
         setAllLanc(ls)
         setAllRec(rs)
-        // Fetch share pra cada competência no range
+        setAllInv(invs)
         const competencias = listMonthsInRange(start, end)
         const sharesArr = await Promise.all(competencias.map((c) => getShare(c).catch(() => null)))
         const map: Record<string, ShareData> = {}
@@ -116,12 +121,28 @@ export function DashboardPage({ competencia, filters }: Props) {
     return allRec.filter((r) => inRange(r.competencia, start, end))
   }, [allRec, start, end])
 
+  /** Investimentos no período: aportes (+) - resgates (-). Filtro por titular
+   *  quando pessoa específica (titulares 'conjunto' ficam fora se pessoa != casal). */
+  const investimentosFiltrados = useMemo(() => {
+    return allInv.filter((m) => {
+      const c = String(m.data).slice(0, 7)
+      if (!inRange(c, start, end)) return false
+      if (pessoa !== 'casal' && m.titular !== pessoa) return false
+      return true
+    })
+  }, [allInv, start, end, pessoa])
+
   // Totais
   const totalDespesas = despesasFiltradas.reduce((s, x) => s + Number(x.row.valor) * x.w, 0)
   const totalReceitas = receitasFiltradas
     .filter((r) => pessoa === 'casal' || r.pessoa === pessoa)
     .reduce((s, r) => s + Number(r.valor), 0)
+  const totalInvestido = investimentosFiltrados.reduce((s, m) => {
+    const v = Number(m.valor) || 0
+    return s + (m.tipo === 'aporte' ? v : -v)
+  }, 0)
   const saldo = totalReceitas - totalDespesas
+  const pctInvestidoDespesas = totalDespesas > 0 ? (totalInvestido / totalDespesas) * 100 : 0
 
   // Por categoria (pie)
   const porCategoria = useMemo(() => {
@@ -135,10 +156,10 @@ export function DashboardPage({ competencia, filters }: Props) {
       .sort((a, b) => b.valor - a.valor)
   }, [despesasFiltradas])
 
-  // Por mês (bar)
+  // Por mês (bar) — agora com Investimentos
   const porMes = useMemo(() => {
-    const map: Record<string, { despesas: number; receitas: number }> = {}
-    for (const m of meses) map[m] = { despesas: 0, receitas: 0 }
+    const map: Record<string, { despesas: number; receitas: number; investimentos: number }> = {}
+    for (const m of meses) map[m] = { despesas: 0, receitas: 0, investimentos: 0 }
     for (const { row, w } of despesasFiltradas) {
       const k = row.competencia
       if (!map[k]) continue
@@ -150,12 +171,19 @@ export function DashboardPage({ competencia, filters }: Props) {
       if (!map[k]) continue
       map[k].receitas += Number(r.valor)
     }
+    for (const m of investimentosFiltrados) {
+      const k = String(m.data).slice(0, 7)
+      if (!map[k]) continue
+      const v = Number(m.valor) || 0
+      map[k].investimentos += m.tipo === 'aporte' ? v : -v
+    }
     return meses.map((m) => ({
       mes: formatCompetenciaBR(m, 'short'),
       Despesas: Math.round(map[m].despesas * 100) / 100,
       Receitas: Math.round(map[m].receitas * 100) / 100,
+      Investimentos: Math.round(map[m].investimentos * 100) / 100,
     }))
-  }, [despesasFiltradas, receitasFiltradas, meses, pessoa])
+  }, [despesasFiltradas, receitasFiltradas, investimentosFiltrados, meses, pessoa])
 
   // Receitas por pessoa (bar empilhado por mês)
   const receitasPorPessoa = useMemo(() => {
@@ -171,6 +199,35 @@ export function DashboardPage({ competencia, filters }: Props) {
       Evellyn: Math.round(map[m].Evellyn * 100) / 100,
     }))
   }, [receitasFiltradas, meses])
+
+  // Despesas por pessoa (bar empilhado por mês) — individuais.dono + share×conjuntas.
+  // Ignora filtros tipo/categoria/pessoa pra mostrar SEMPRE a foto Bam vs Evellyn.
+  const despesasPorPessoa = useMemo(() => {
+    const map: Record<string, { Bam: number; Evellyn: number }> = {}
+    for (const m of meses) map[m] = { Bam: 0, Evellyn: 0 }
+    for (const r of allLanc) {
+      if (!inRange(r.competencia, start, end)) continue
+      if (filters.categoria && r.categoria !== filters.categoria) continue
+      if (filters.tipo && r.tipo !== filters.tipo) continue
+      const k = r.competencia
+      if (!map[k]) continue
+      const v = Number(r.valor) || 0
+      if (r.tipo === 'individual') {
+        if (r.dono === 'Bam' || r.dono === 'Evellyn') map[k][r.dono] += v
+      } else {
+        // conjunto — split pelo share da competência (50/50 se desconhecido)
+        const s = shares[r.competencia]
+        const shareBam = s ? s.Bam : 0.5
+        map[k].Bam += v * shareBam
+        map[k].Evellyn += v * (1 - shareBam)
+      }
+    }
+    return meses.map((m) => ({
+      mes: formatCompetenciaBR(m, 'short'),
+      Bam: Math.round(map[m].Bam * 100) / 100,
+      Evellyn: Math.round(map[m].Evellyn * 100) / 100,
+    }))
+  }, [allLanc, shares, meses, start, end, filters.tipo, filters.categoria])
 
   // -------- render --------
 
@@ -206,30 +263,9 @@ export function DashboardPage({ competencia, filters }: Props) {
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}
 
-      <div className="card resumo" style={{ marginBottom: '1rem' }}>
-        <div className="resumo-grid">
-          <div>
-            <span className="muted">Despesas</span>
-            <strong>{formatBRL(totalDespesas)}</strong>
-            <span className="muted">Receitas</span>
-            <strong>{formatBRL(totalReceitas)}</strong>
-            <span className="muted">Saldo</span>
-            <strong className={saldo >= 0 ? 'pos' : 'neg'}>{formatBRL(saldo)}</strong>
-          </div>
-          <div>
-            <span className="muted">% gasto</span>
-            <strong>{totalReceitas > 0 ? ((totalDespesas / totalReceitas) * 100).toFixed(0) : '—'}%</strong>
-            <span className="muted">Despesas/mês (média)</span>
-            <strong>{formatBRL(totalDespesas / Math.max(1, meses.length))}</strong>
-            <span className="muted">Categorias ativas</span>
-            <strong>{porCategoria.length}</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* Despesas por mês */}
+      {/* Despesas × Receitas × Investimentos por mês */}
       <div className="card" style={{ marginBottom: '1rem' }}>
-        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Despesas × Receitas por mês</h3>
+        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Despesas × Receitas × Investimentos por mês</h3>
         <div style={{ width: '100%', height: 240 }}>
           <ResponsiveContainer>
             <BarChart data={porMes} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
@@ -240,6 +276,7 @@ export function DashboardPage({ competencia, filters }: Props) {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Despesas" fill="#ef4444" />
               <Bar dataKey="Receitas" fill="#10b981" />
+              <Bar dataKey="Investimentos" fill="#8b5cf6" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -290,7 +327,27 @@ export function DashboardPage({ competencia, filters }: Props) {
         )}
       </div>
 
-      {/* Receitas por pessoa (apenas em modo casal — mostra split) */}
+      {/* Despesas por pessoa (split via share nas conjuntas) */}
+      {pessoa === 'casal' && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Despesas por pessoa (rateado pelo share)</h3>
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <BarChart data={despesasPorPessoa} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={fmtTooltip} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="Bam" stackId="d" fill={COLOR_BAM} />
+                <Bar dataKey="Evellyn" stackId="d" fill={COLOR_EVELLYN} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Receitas por pessoa */}
       {pessoa === 'casal' && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Receitas por pessoa</h3>
@@ -309,6 +366,32 @@ export function DashboardPage({ competencia, filters }: Props) {
           </div>
         </div>
       )}
+
+      {/* Resumo de totais — agora no fim */}
+      <div className="card resumo" style={{ marginBottom: '1rem' }}>
+        <div className="resumo-grid">
+          <div>
+            <span className="muted">Despesas</span>
+            <strong>{formatBRL(totalDespesas)}</strong>
+            <span className="muted">Receitas</span>
+            <strong>{formatBRL(totalReceitas)}</strong>
+            <span className="muted">Investido (líquido)</span>
+            <strong className={totalInvestido >= 0 ? 'pos' : 'neg'}>{formatBRL(totalInvestido)}</strong>
+            <span className="muted">Saldo</span>
+            <strong className={saldo >= 0 ? 'pos' : 'neg'}>{formatBRL(saldo)}</strong>
+          </div>
+          <div>
+            <span className="muted">% gasto da receita</span>
+            <strong>{totalReceitas > 0 ? ((totalDespesas / totalReceitas) * 100).toFixed(0) : '—'}%</strong>
+            <span className="muted">Investido / Despesas</span>
+            <strong>{totalDespesas > 0 ? `${pctInvestidoDespesas.toFixed(0)}%` : '—'}</strong>
+            <span className="muted">Despesas/mês (média)</span>
+            <strong>{formatBRL(totalDespesas / Math.max(1, meses.length))}</strong>
+            <span className="muted">Categorias ativas</span>
+            <strong>{porCategoria.length}</strong>
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
