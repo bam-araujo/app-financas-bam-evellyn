@@ -1,6 +1,7 @@
 import { useMemo, useReducer, useState } from 'react'
 import { batchCreate, createSerieParcelado, createSerieRecorrente, lancamentos as lancamentosApi, type WhoamiData } from '../api/client'
 import type { CreatePayload, LancamentoRow, Pessoa } from '../api/types'
+import { useAutoCategorias } from '../hooks/useAutoCategorias'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
@@ -26,6 +27,7 @@ export function ImportarPage({ me }: Props) {
     () => cats.data.filter((c) => c.grupo === 'despesa').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
     [cats.data],
   )
+  const autoCat = useAutoCategorias()
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -41,12 +43,15 @@ export function ImportarPage({ me }: Props) {
       const venc = result.meta.vencimento || ''
       const initial: LineState[] = result.transactions.map((tx) => {
         const detectouParcela = !!(tx.parcela_num && tx.parcela_total)
+        const descTxt = detectouParcela
+          ? `${tx.descricao} (${tx.parcela_num}/${tx.parcela_total})`
+          : tx.descricao
         return {
           data: venc,
-          descricao: detectouParcela
-            ? `${tx.descricao} (${tx.parcela_num}/${tx.parcela_total})`
-            : tx.descricao,
-          categoria: '',
+          descricao: descTxt,
+          // Pré-categoriza se houver mapping aprendido (não-bloqueante; user
+          // pode trocar antes de salvar).
+          categoria: autoCat.suggest(descTxt),
           valor_input: tx.valor > 0 ? String(tx.valor).replace('.', ',') : '',
           // Prefill pagador com o usuário logado (faturas geralmente são da própria pessoa).
           pagador: (me?.nome as Pessoa) || 'Bam',
@@ -199,6 +204,12 @@ export function ImportarPage({ me }: Props) {
       }
 
       dispatch({ type: 'SAVE_OK', result: { ok, fail: errs.length, errors: errs.slice(0, 5) } })
+
+      // Registra mappings de cada linha salva pra próximas importações.
+      // Não-bloqueante; cada linha sequencial pra evitar rajada no Apps Script.
+      for (const l of selectedLines) {
+        await autoCat.record(l.descricao.trim(), l.categoria).catch(() => undefined)
+      }
     } catch (err) {
       dispatch({ type: 'SAVE_FAIL', error: (err as Error).message })
     }

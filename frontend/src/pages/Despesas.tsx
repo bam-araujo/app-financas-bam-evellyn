@@ -3,6 +3,7 @@ import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos, typ
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
 import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
+import { useAutoCategorias } from '../hooks/useAutoCategorias'
 import { useCategorias } from '../hooks/useCategorias'
 import { useCrudForm } from '../hooks/useCrudForm'
 import { competenciaFromDate, todayISO } from '../lib/competencia'
@@ -47,6 +48,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
     () => cats.data.filter((c) => c.grupo === 'despesa').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
     [cats.data],
   )
+  const autoCat = useAutoCategorias()
 
   function fetchList() {
     setLoading(true)
@@ -115,6 +117,8 @@ export function DespesasPage({ competencia, filters, me }: Props) {
           parcela_total: 0,
         })
       }
+      // Registra mapping pra próximas vezes (não-bloqueante).
+      autoCat.record(base.descricao, base.categoria).catch(() => undefined)
     },
     onSaved: fetchList,
   })
@@ -221,7 +225,15 @@ export function DespesasPage({ competencia, filters, me }: Props) {
               value={form.descricao}
               maxLength={120}
               placeholder="Mercado, Uber, etc."
-              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+              onChange={(e) => {
+                const v = e.target.value
+                // Auto-sugere categoria quando ainda não há uma. Só sugere
+                // se o user está digitando algo razoável (>= 4 chars).
+                const suggestion = !form.categoria && v.trim().length >= 4
+                  ? autoCat.suggest(v)
+                  : ''
+                setForm({ ...form, descricao: v, categoria: suggestion || form.categoria })
+              }}
             />
           </label>
 

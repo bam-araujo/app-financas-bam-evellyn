@@ -193,6 +193,19 @@ const SCHEMA = {
       fechado_em: V.stringOptional,
     },
   },
+  // Mapeamentos "substring → categoria" aprendidos com o histórico.
+  // Usado pra sugerir categoria automaticamente no Import e no form de
+  // Despesas. Substring sempre minúscula, trimmed. Hits incrementado a
+  // cada uso confirmado (não-obrigatório usar pra ordenar).
+  auto_categorias: {
+    columns: ['id', 'substring', 'categoria', 'hits'],
+    required: ['substring', 'categoria'],
+    validators: {
+      substring: V.stringRequired,
+      categoria: V.stringRequired,
+      hits: V.numberOptional,
+    },
+  },
   // Acertos efetivamente pagos entre o casal. Subtraídos do saldo
   // calculado no Acerto pra zerar quando alguém quita o que devia.
   acertos_pagos: {

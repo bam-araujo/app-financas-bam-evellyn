@@ -81,6 +81,12 @@ export interface AcertoPagoRow extends RowBase {
   descricao: string
 }
 
+export interface AutoCategoriaRow extends RowBase {
+  substring: string            // lowercase, trimmed
+  categoria: string
+  hits: number
+}
+
 export interface TableMap {
   pessoas: PessoaRow
   categorias: CategoriaRow
@@ -89,6 +95,7 @@ export interface TableMap {
   investimentos_saldos: InvestimentoSaldoRow
   investimentos_movimentos: InvestimentoMovimentoRow
   acertos_pagos: AcertoPagoRow
+  auto_categorias: AutoCategoriaRow
 }
 
 export type TableName = keyof TableMap
