@@ -3,7 +3,7 @@ import { batchCreate, createSerieParcelado, createSerieRecorrente } from '../api
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
-import { extractPdfLines } from '../lib/parsers/pdf-extract'
+import { extractPdfLines, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
 import { type ParsedFatura, parseItauFatura } from '../lib/parsers/itau-fatura'
 
 type LineState = {
@@ -299,6 +299,27 @@ export function ImportarPage() {
                 }}>
                   {rawLines.map((l, i) => `${String(i + 1).padStart(3, ' ')}: ${l}`).join('\n')}
                 </pre>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}
+                  onClick={async () => {
+                    const items = getLastExtractionDebug()
+                    const dump = items
+                      .map((it) => `p${it.page} y=${it.y.toFixed(0)} x=${it.x.toFixed(0)} w=${it.w.toFixed(0)} | ${it.str}`)
+                      .join('\n')
+                    try {
+                      await navigator.clipboard.writeText(dump)
+                      alert(`Copiado ${items.length} items pra clipboard.`)
+                    } catch {
+                      // fallback: log
+                      console.log(dump)
+                      alert('Não consegui copiar. Itens estão no console (F12).')
+                    }
+                  }}
+                >
+                  Copiar items com coordenadas (pra debug)
+                </button>
               </details>
             )}
           </div>
