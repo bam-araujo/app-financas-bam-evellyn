@@ -175,3 +175,4 @@ VITE_API_URL=... API_TOKEN=... node backend/qa-e2e.mjs
 | Pages 404 | Source não está como *GitHub Actions* ou build falhou | Conferir **Settings → Pages**; reabrir **Actions** |
 | Mudei `.gs` e nada mudou | Esqueceu de criar nova versão | **Implantar → Gerenciar implantações → editar → versão: Nova versão** |
 | Usuário logado, mas `whoami` falha | A planilha foi reinicializada e perdeu o email | Editar a aba `pessoas` e preencher emails de novo |
+| Clico em "Sign in with Google" e abre o Gmail em vez de logar | Sessão Google de outra conta presa no navegador (Gmail/Drive aberto em outra aba); GIS confunde | Janela anônima funciona sempre. Pra uso recorrente: use perfil dedicado do Chrome ou saia do Gmail antes |
