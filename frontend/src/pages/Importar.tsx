@@ -1,11 +1,16 @@
-import { useMemo, useReducer } from 'react'
-import { batchCreate, createSerieParcelado, createSerieRecorrente, type WhoamiData } from '../api/client'
-import type { CreatePayload, Pessoa } from '../api/types'
+import { useMemo, useReducer, useState } from 'react'
+import { batchCreate, createSerieParcelado, createSerieRecorrente, lancamentos as lancamentosApi, type WhoamiData } from '../api/client'
+import type { CreatePayload, LancamentoRow, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
 import { parseItauFatura } from '../lib/parsers/itau-fatura'
 import { importarReducer, initialImportarState, type LineState } from './importarReducer'
+
+/** Hash de match pro dedupe: data + valor (2 casas) + início da descrição. */
+function dupeKey(data: string, valor: number, descricao: string): string {
+  return `${data}|${valor.toFixed(2)}|${descricao.slice(0, 30).toLowerCase().trim()}`
+}
 
 interface Props {
   me: WhoamiData | null
@@ -14,6 +19,7 @@ interface Props {
 export function ImportarPage({ me }: Props) {
   const [state, dispatch] = useReducer(importarReducer, initialImportarState)
   const { phase, error, parsed, rawLines, lines, saveResult } = state
+  const [showOnlyDupes, setShowOnlyDupes] = useState(false)
 
   const cats = useCategorias()
   const despesaCats = useMemo(
@@ -59,13 +65,51 @@ export function ImportarPage({ me }: Props) {
         }
       })
       dispatch({ type: 'PARSE_OK', rawLines, parsed: result, lines: initial })
+
+      // Dedupe assíncrono: busca lançamentos da competência do vencimento
+      // (e da anterior, pra cobrir casos onde a data da compra é mês passado),
+      // monta um set de chaves data+valor+descricao, e marca as linhas batidas.
+      // Não bloqueia o usuário — se falhar, o import segue sem dedupe.
+      try {
+        const comp = (venc || '').slice(0, 7)
+        const compAnterior = comp ? shiftCompetencia(comp, -1) : ''
+        const lookups: Promise<LancamentoRow[]>[] = []
+        if (comp) lookups.push(lancamentosApi.list({ competencia: comp }))
+        if (compAnterior) lookups.push(lancamentosApi.list({ competencia: compAnterior }))
+        const existing = (await Promise.all(lookups)).flat()
+        const existingKeys = new Set(
+          existing.map((r) => dupeKey(r.data, Number(r.valor) || 0, r.descricao || '')),
+        )
+        const dupeIdx: number[] = []
+        initial.forEach((line, i) => {
+          const k = dupeKey(line.data, parseBRL(line.valor_input), line.descricao)
+          if (existingKeys.has(k)) dupeIdx.push(i)
+        })
+        if (dupeIdx.length > 0) {
+          dispatch({ type: 'SET_DUPE_FLAGS', dupeIndexes: dupeIdx })
+        }
+      } catch {
+        // Silenciar — dedupe é melhor-esforço; lookup pode falhar transient.
+      }
     } catch (err) {
       dispatch({ type: 'PARSE_FAIL', error: (err as Error).message })
     }
   }
 
+  function shiftCompetencia(yyyymm: string, delta: number): string {
+    const [yStr, mStr] = yyyymm.split('-')
+    let y = Number(yStr), m = Number(mStr) + delta
+    while (m <= 0) { m += 12; y -= 1 }
+    while (m > 12) { m -= 12; y += 1 }
+    return `${y}-${String(m).padStart(2, '0')}`
+  }
+
   const selectedLines = lines.filter((l) => l.selected)
   const total = selectedLines.reduce((s, l) => s + parseBRL(l.valor_input), 0)
+  const dupeCount = lines.filter((l) => l.dupe).length
+  const visibleLines = lines
+    .map((l, i) => ({ line: l, index: i }))
+    .filter(({ line }) => (showOnlyDupes ? line.dupe : true))
   function lineReady(l: LineState): boolean {
     const v = parseBRL(l.valor_input)
     if (!l.data || !l.descricao.trim() || !l.categoria || !v || v <= 0) return false
@@ -231,10 +275,22 @@ export function ImportarPage({ me }: Props) {
               {Math.abs(total - parsed.meta.total) > 0.05 && parsed.meta.total > 0 && (
                 <span className="muted-light"> (≠ total da fatura — confere)</span>
               )}
+              {dupeCount > 0 && (
+                <> · <span className="muted-light">{dupeCount} duplicada{dupeCount === 1 ? '' : 's'} (desmarcadas por padrão)</span></>
+              )}
             </p>
             <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button type="button" className="btn" onClick={() => dispatch({ type: 'TOGGLE_ALL', selected: true })}>Selecionar todas</button>
               <button type="button" className="btn" onClick={() => dispatch({ type: 'TOGGLE_ALL', selected: false })}>Limpar seleção</button>
+              {dupeCount > 0 && (
+                <button
+                  type="button"
+                  className={'btn' + (showOnlyDupes ? ' btn-active' : '')}
+                  onClick={() => setShowOnlyDupes((v) => !v)}
+                >
+                  {showOnlyDupes ? 'Mostrar todas' : `Só duplicadas (${dupeCount})`}
+                </button>
+              )}
               <button type="button" className="btn" onClick={() => dispatch({ type: 'RESET' })}>Trocar arquivo</button>
             </div>
             {rawLines.length > 0 && (
@@ -281,8 +337,8 @@ export function ImportarPage({ me }: Props) {
           </div>
 
           <ul className="rows import-rows">
-            {lines.map((l, i) => (
-              <li key={i} className={'row import-row' + (l.selected ? '' : ' import-row-off')}>
+            {visibleLines.map(({ line: l, index: i }) => (
+              <li key={i} className={'row import-row' + (l.selected ? '' : ' import-row-off') + (l.dupe ? ' import-row-dupe' : '')}>
                 <label className="import-check">
                   <input
                     type="checkbox"
@@ -291,6 +347,11 @@ export function ImportarPage({ me }: Props) {
                   />
                 </label>
                 <div className="import-row-body">
+                  {l.dupe && (
+                    <p className="muted-light" style={{ margin: 0, fontSize: '0.7rem' }}>
+                      ⚠ provável duplicada — já existe lançamento com mesma data + valor + descrição
+                    </p>
+                  )}
                   <div className="import-line">
                     <input
                       type="date"

@@ -691,6 +691,10 @@ main {
   gap: 0.4rem;
 }
 .import-row-off { opacity: 0.55; }
+.import-row-dupe {
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
 .import-line {
   display: flex;
   gap: 0.4rem;

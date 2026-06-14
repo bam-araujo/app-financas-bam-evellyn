@@ -20,6 +20,9 @@ export type LineState = {
   repeticao: 'unico' | 'parcelado' | 'recorrente'
   parcelas: number
   selected: boolean
+  // Dedup: setado quando há lançamento existente com mesma data+valor+inicio-de-descricao.
+  // Quando true, vem desmarcado por padrão (selected=false) pra evitar duplicar.
+  dupe?: boolean
   // info do parser, só pra contexto/badge
   parser_parcela_num?: number
   parser_parcela_total?: number
@@ -57,6 +60,7 @@ export type ImportarAction =
   | { type: 'PARSE_FAIL'; error: string }
   | { type: 'UPDATE_LINE'; index: number; patch: Partial<LineState> }
   | { type: 'TOGGLE_ALL'; selected: boolean }
+  | { type: 'SET_DUPE_FLAGS'; dupeIndexes: number[] }
   | { type: 'SAVE_START' }
   | { type: 'SAVE_OK'; result: SaveResult }
   | { type: 'SAVE_FAIL'; error: string }
@@ -83,6 +87,16 @@ export function importarReducer(state: ImportarState, action: ImportarAction): I
       }
     case 'TOGGLE_ALL':
       return { ...state, lines: state.lines.map((l) => ({ ...l, selected: action.selected })) }
+    case 'SET_DUPE_FLAGS': {
+      // Linhas marcadas como dupe ficam desmarcadas por padrão.
+      const dupes = new Set(action.dupeIndexes)
+      return {
+        ...state,
+        lines: state.lines.map((l, i) =>
+          dupes.has(i) ? { ...l, dupe: true, selected: false } : { ...l, dupe: false },
+        ),
+      }
+    }
     case 'SAVE_START':
       return { ...state, phase: 'saving', error: null }
     case 'SAVE_OK':
