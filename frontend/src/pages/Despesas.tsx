@@ -3,8 +3,9 @@ import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos } fr
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
 import type { GlobalFilters } from '../components/Filters'
 import { useCategorias } from '../hooks/useCategorias'
-import { formatBRL, formatCompetenciaBR, formatDateBR, parseBRL } from '../lib/format'
 import { competenciaFromDate, todayISO } from '../lib/competencia'
+import { formatBRL, formatCompetenciaBR, formatDateBR, parseBRL } from '../lib/format'
+import { lancamentoWeight } from '../lib/rateio'
 
 interface Props {
   competencia: string
@@ -86,15 +87,10 @@ export function DespesasPage({ competencia, filters }: Props) {
     })
   }, [rows, filters])
 
-  /** Peso aplicado à despesa pro cálculo de totais — só relevante quando pessoa
-   *  é específica e o toggle de rateio está ligado. */
-  function weight(r: LancamentoRow): number {
-    if (filters.pessoa === 'casal') return 1
-    if (r.tipo === 'individual') return 1
-    if (!filters.rateio) return 1
-    if (!share) return 0.5
-    return share[filters.pessoa as 'Bam' | 'Evellyn']
-  }
+  /** Peso aplicado à despesa pro cálculo de totais.
+   *  Toda página de Despesas opera em uma competência só, então o shareGetter
+   *  ignora o argumento e devolve o mesmo share (ou null se ainda não chegou). */
+  const weight = (r: LancamentoRow) => lancamentoWeight(r, filters.pessoa, filters.rateio, () => share)
 
   function toggleNew() {
     if (formOpen) { setFormOpen(false); setFormError(null); return }
