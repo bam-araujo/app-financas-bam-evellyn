@@ -21,6 +21,15 @@ const API_TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string }
 
+/**
+ * Erro disparado quando o Google retornou algo transient (HTTP 5xx, falha
+ * de rede, resposta sem JSON). Sinaliza ao withRetry que vale a pena tentar
+ * de novo — diferentemente de um {ok:false, error} de regra de negócio.
+ */
+class TransientApiError extends Error {
+  constructor(msg: string) { super(msg); this.name = 'TransientApiError' }
+}
+
 function assertConfigured(): { url: string; token: string } {
   if (!API_URL || !API_TOKEN) {
     throw new Error(
@@ -30,31 +39,64 @@ function assertConfigured(): { url: string; token: string } {
   return { url: API_URL, token: API_TOKEN }
 }
 
+/**
+ * Roda `fn`. Se ela lançar um TransientApiError, espera 800ms e tenta
+ * mais 1 vez. Esse padrão cobre os 500s esporádicos do Apps Script em
+ * rajadas (Google segura o pedido por alguns segundos e responde 500 na
+ * primeira; segunda tentativa quase sempre vai).
+ */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    if (!(err instanceof TransientApiError)) throw err
+    await new Promise((r) => setTimeout(r, 800))
+    return fn()
+  }
+}
+
+/** fetch que converte falha de rede em TransientApiError (retryable). */
+async function fetchTransient(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (err) {
+    throw new TransientApiError(`Falha de rede: ${(err as Error).message}`)
+  }
+}
+
 /** GET de baixo nível — usado por list/get. */
 async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
   const { url, token } = assertConfigured()
   const qs = new URLSearchParams({ action, token, ...params })
-  const res = await fetch(`${url}?${qs.toString()}`, { method: 'GET' })
-  return unwrap<T>(res)
+  return withRetry(async () => {
+    const res = await fetchTransient(`${url}?${qs.toString()}`, { method: 'GET' })
+    return unwrap<T>(res)
+  })
 }
 
 /** POST de baixo nível — usado por create/update/delete. */
 async function apiPost<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
   const { url, token } = assertConfigured()
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, token, ...body }),
+  return withRetry(async () => {
+    const res = await fetchTransient(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, token, ...body }),
+    })
+    return unwrap<T>(res)
   })
-  return unwrap<T>(res)
 }
 
 async function unwrap<T>(res: Response): Promise<T> {
+  // 5xx do Google são transientes — vale retry.
+  if (res.status >= 500) throw new TransientApiError(`HTTP ${res.status}`)
   let payload: ApiResponse<T>
   try {
     payload = (await res.json()) as ApiResponse<T>
   } catch {
-    throw new Error(`Resposta inválida da API (HTTP ${res.status})`)
+    // JSON inválido geralmente é HTML de erro do Google (timeout, 5xx
+    // disfarçado de 200 etc.) — também retryable.
+    throw new TransientApiError(`Resposta inválida da API (HTTP ${res.status})`)
   }
   if (!payload.ok) throw new Error(payload.error || `HTTP ${res.status}`)
   return payload.data
