@@ -12,10 +12,12 @@ Produção: https://bam-araujo.github.io/app-financas-bam-evellyn/
 
 Stack:
 - **Frontend:** React + Vite + TypeScript, instalável como PWA, em `/frontend`
-- **Backend:** Google Apps Script (8 módulos `.gs`), em `/backend`
-- **Banco:** Google Sheets (7 abas — schema em `01_Schema.gs`)
+- **Backend:** Google Apps Script (9 módulos `.gs` — `00_Config` até `08_Auth`), em `/backend`
+- **Banco:** Google Sheets (10 abas — schema em `01_Schema.gs`)
 - **Auth:** OAuth Google (id_token) + allowlist na aba `pessoas`
 - **CI/CD:** GitHub Actions → Pages, deploy automático em push pra `main`
+
+Abas atuais: `pessoas`, `categorias`, `receitas`, `lancamentos`, `investimentos_saldos`, `investimentos_movimentos`, `share_mensal`, `orcamento`, `auto_categorias`, `acertos_pagos`.
 
 ---
 
@@ -85,20 +87,25 @@ frontend/
       client.ts                   # fetch + retry + auth (id_token)
       types.ts                    # tipos do schema (manualmente sync com backend)
     components/
+      BudgetProgress.tsx          # barra verde/amarela/vermelha pra orçamento
       CompetenciaSelector.tsx
-      EntityList.tsx              # ◆ lista genérica loading/erro/vazio + delete
+      ConfirmDialog.tsx           # ◆ modal genérico com N opções (Promise-based)
+      EntityList.tsx              # ◆ lista genérica loading/erro/vazio + delete + renderAfterRow
       Filters.tsx                 # filtros globais com badge de contagem
       InvestRowList.tsx           # variante card+título de EntityList
       LoginGate.tsx               # tela de entrada com botão GIS
+      SearchPalette.tsx           # Cmd/Ctrl+K busca global
       Tabs.tsx
       charts/
         ChartCategoryPie.tsx
         ChartMonthlyFlow.tsx
         ChartStackedByPessoa.tsx
         EvolucaoPatrimonio.tsx
+        OrcamentoCard.tsx         # top categorias com barra de progresso no Home
         ResumoTotaisCard.tsx
     hooks/
       useAuth.ts                  # GIS init + sessão + currentIdToken()
+      useAutoCategorias.ts        # suggest/record substring → categoria
       useCategorias.ts
       useCrudForm.ts              # ◆ form genérico (open/save/edit/close)
       useHashRoute.ts
@@ -114,16 +121,18 @@ frontend/
         itau-fatura.ts            # parser Itaú PDF
         pdf-extract.ts            # pdf.js wrapper
     pages/
-      Acerto.tsx
-      Dashboard.tsx
-      Despesas.tsx                # usa useCrudForm + EntityList
-      Importar.tsx                # usa importarReducer
-      importarReducer.ts          # 9 actions: PARSE_START/OK/FAIL, UPDATE_LINE...
+      Acerto.tsx                  # acerto + marcar pago (acertos_pagos)
+      Dashboard.tsx               # Home: progressive load (lists → shares background)
+      Despesas.tsx                # useCrudForm + EntityList + form inline + dialog scope
+      Importar.tsx                # importarReducer + dedupe + auto-cat
+      importarReducer.ts          # 10 actions incl. SET_DUPE_FLAGS
       Investimentos.tsx           # 2x useCrudForm + useInvestimentoInsights + InvestRowList
-      Receitas.tsx                # usa useCrudForm + EntityList
+      Orcamento.tsx               # CRUD de limite por categoria/mês + copiar mês anterior
+      Receitas.tsx                # useCrudForm + EntityList + form inline
 docs/
   SETUP.md                        # setup zero-to-prod
   QA-REPORT.md                    # snapshot histórico 2026-06-14 (29/29 passes)
+  BACKLOG.md                      # roadmap priorizado de produto (S/A/B/C)
 PRs-app-financas.md               # histórico dos 7 PRs originais
 README.md                         # entry point
 AGENTS.md                         # este arquivo
@@ -186,11 +195,45 @@ Lista padrão com loading/erro/vazio + linha clicável (edita) + delete.
   emptyMsg="Nenhum lançamento."
   items={filtered} itemKey={(r) => r.id}
   onEdit={editFromRow} onDelete={remove}
+  renderAfterRow={(r) => /* opcional: form inline, drawer, etc. */}
   renderRow={(r) => <>...</>}
 />
 ```
 
+Padrão de `editFromRow` recomendado: **toggle** — clicar de novo na mesma row com form aberto fecha:
+
+```tsx
+function editFromRow(r) {
+  if (formOpen && form.id === r.id) { closeForm(); return }
+  openEdit({...})
+}
+```
+
+E o form vira função local `renderForm()` chamada de 2 lugares: top da página (criar novo) e `renderAfterRow` (inline pra edit). Padrão em uso em Despesas e Receitas.
+
 Variante com card+título: `InvestRowList` (usar quando precisar do wrapper de card + count, ex.: Investimentos).
+
+### `ConfirmDialog` ([components/ConfirmDialog.tsx](frontend/src/components/ConfirmDialog.tsx))
+
+Modal genérico com N opções, perfeito pra escolhas tripartites tipo "esta linha / esta + futuras / cancelar". Mais flexível que `window.confirm()` que é binário.
+
+Helper Promise-based recomendado (em uso em Despesas):
+
+```tsx
+function openDialog<T>(config: { title, message?, choices: {label, value: T, primary?, danger?}[] }): Promise<T | null> {
+  return new Promise((resolve) => {
+    setDialogState({
+      title, message,
+      options: config.choices.map((c) => ({ ...c, onClick: () => { setDialogState(null); resolve(c.value) } })),
+      onClose: () => { setDialogState(null); resolve(null) },  // Esc / overlay → null = cancel
+    })
+  })
+}
+
+// uso:
+const scope = await openDialog<'this' | 'forward'>({ ... })
+if (scope === null) throw new Error('cancelado')
+```
 
 ### `useReducer` ([pages/importarReducer.ts](frontend/src/pages/importarReducer.ts))
 
@@ -239,7 +282,12 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 - **Year inference no parser Itaú:** heurística `mes_compra > mes_venc → ano − 1`. Quebra em parcelas longas de 2+ anos antes — caso real raro, mas saiba que existe.
 - **Recorrente é auto-estendida.** Criação inicial gera 24 linhas; backend `extend_recorrentes` (chamado uma vez por sessão no boot) clona a última linha de cada série pra cobrir sempre os próximos 12 meses além da competência atual. Edição/exclusão da última linha vira o "template" pra futuras extensões.
 - **Edit/Delete em série pergunta scope.** Linhas com `serie_id` abrem `<ConfirmDialog>` com escolha "esta linha" ou "esta + futuras". Backend implementa via `update_serie_forward` e `delete_serie_forward`. Campos propagados em forward: `descricao, categoria, valor, pagador, tipo, dono` (`data` e `competencia` ficam por linha).
+- **Conversão de repetição é bidirecional.** Standalone→série, série→outro tipo, série→única — todas funcionam. Conversão de série pra outro tipo (incl. única) usa `deleteSerieForward(id, 'forward')` + cria novo conforme o tipo. Passados da série ficam preservados.
 - **Conjunto não rateia em Investimentos.** Patrimônio comum tem categoria própria (`titular = conjunto`).
+- **Acerto pago é registrado, não some.** Tabela `acertos_pagos` guarda histórico. Saldo bruto = pago − devido; saldo final = saldo bruto − liquidados. Pra "zerar" um acerto, registrar pagamento (não apagar despesas).
+- **Auto-categorização** ([useAutoCategorias](frontend/src/hooks/useAutoCategorias.ts)) aprende `substring → categoria` ao salvar despesa. Substring é tokenizada (≥4 chars). Em conflito (mesma substring com categoria diferente), backend NÃO sobrescreve — tenta próximo token. `record()` não refaz refetch automático; caller que chama em batch deve invocar `refetch()` ao final.
+- **Dedupe no import** usa só `data + valor` (não inclui descrição). Aceita falso positivo (raro) pra evitar falso negativo se user renomeou.
+- **Orçamento** ([orcamento table](backend/01_Schema.gs)) é por `(competencia, categoria)`. `BudgetProgress` rende a barra; `OrcamentoCard` no Dashboard mostra top categorias por % usado.
 
 ### Frontend
 
@@ -268,9 +316,26 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 ### Adicionar uma tabela nova
 
 1. Definir schema em `01_Schema.gs` (tabela vira parte de `SCHEMA`, entra em `TABLES`).
-2. Rodar `initSchema()` no editor Apps Script pra criar a aba.
+2. Rodar `initSchema()` no editor Apps Script pra criar a aba — OU deixar que `getOrCreateSheet_` crie sob demanda na primeira request.
 3. Adicionar tipo em `frontend/src/api/types.ts`.
 4. Exportar `makeTableApi('nome')` em `frontend/src/api/client.ts`.
+
+### Adicionar uma categoria nova
+
+Duas formas (a primeira é a mais rápida):
+
+1. **Direto na planilha** (mais simples): aba `categorias` → nova linha com `id` (qualquer string única, idealmente UUID v4), `nome`, `grupo` (`despesa` ou `receita`).
+2. **Via seed do `initSchema`**: editar `07_InitSchema.gs`, adicionar entrada em `cats[]`, salvar no editor, rodar `initSchema()` (idempotente — não duplica existentes).
+
+Categorias novas aparecem nos dropdowns após F5 no app — `useCategorias` faz fetch ao montar, sem cache persistente.
+
+### Adicionar um endpoint backend novo
+
+1. Implementar função em algum módulo (`05_Series.gs`, `06_Share.gs`, ou módulo próprio).
+2. Adicionar nome do action em `PUBLIC_ACTIONS` (`00_Config.gs`).
+3. Adicionar `case` no switch de `handle_()` em `03_Main.gs` — usar `withLock_()` se for escrita.
+4. Adicionar helper em `frontend/src/api/client.ts`.
+5. Republicar Web App (Nova versão) — endpoints novos só são reachable depois disso.
 
 ### Mudar a regra de algum cálculo (share, rendimento, rateio)
 
@@ -323,3 +388,6 @@ Roadmap de produto priorizado vive em [docs/BACKLOG.md](docs/BACKLOG.md). Tiers 
 - **PRs originais (1–7):** ver [PRs-app-financas.md](PRs-app-financas.md) — todos entregues.
 - **QA bateria 2026-06-14 (29/29):** ver [docs/QA-REPORT.md](docs/QA-REPORT.md).
 - **Migração OAuth:** commit `407c0bf`. Antes era shared token público (vazava no bundle); agora é id_token Google + allowlist na planilha.
+- **Tier S de produto (2026-06-14):** commits `5b259ee` → `010bbfe`. Busca global, dedupe import, marcar acerto pago, auto-categorização, orçamento por categoria.
+- **Séries infinitas + edit/delete forward (1bfc38a):** recorrentes não têm mais limite de 24 meses; backend `extend_recorrentes` mantém cobertura rolling. Edit/Delete em série abre dialog "esta / esta + futuras".
+- **Conversão bidirecional de repetição (93d825a):** standalone↔parcelado↔recorrente↔único, todos os sentidos.

@@ -10,7 +10,11 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 **Tese geral da v2:** o app hoje pede pra você *registrar* o que aconteceu. O próximo salto é fazê-lo *te avisar* e *te projetar* — virar raio-x ativo da situação financeira em vez de só log do passado.
 
-> **Status atual (2026-06-14):** Tier S inteiro entregue (S1–S5, commits `5b259ee` → `010bbfe`). Próxima onda = Tier A. **EXIGE redeploy do Apps Script** (Nova versão) — 3 tabelas novas (`acertos_pagos`, `auto_categorias`, `orcamento`) só aparecem na planilha quando o backend novo recebe a primeira request com elas no SCHEMA.
+> **Status atual (2026-06-14):** Tier S inteiro entregue (S1–S5, commits `5b259ee` → `010bbfe`). Próxima onda = Tier A.
+>
+> **Polish pós-Tier S (ainda em 2026-06-14):** série recorrente virou auto-estendida (`1bfc38a`), edit/delete em série abre dialog scope (`1bfc38a`), conversão de repetição bidirecional standalone↔série↔série (`93d825a`), form de edit aparece inline (`42c19fc`), clique-novamente fecha edit (`93d825a`), dedupe import só por data+valor + default cartão=individual + save em paralelo (`56a695e`), busca global respeita competência do item (`0e89464`), Dashboard carrega em ~5s (`96bccf9`).
+>
+> Tier S adicionou 3 tabelas (`orcamento`, `auto_categorias`, `acertos_pagos`) e 3 endpoints de série (`extend_recorrentes`, `delete_serie_forward`, `update_serie_forward`). Já refletidos no Apps Script publicado.
 
 ---
 
