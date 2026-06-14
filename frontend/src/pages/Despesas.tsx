@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createSerieParcelado, createSerieRecorrente, lancamentos } from '../api/client'
-import type { LancamentoRow, Pessoa } from '../api/types'
+import { createSerieParcelado, createSerieRecorrente, getShare, lancamentos } from '../api/client'
+import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
+import type { GlobalFilters } from '../components/Filters'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatCompetenciaBR, formatDateBR, parseBRL } from '../lib/format'
 import { competenciaFromDate, todayISO } from '../lib/competencia'
 
 interface Props {
   competencia: string
+  filters: GlobalFilters
 }
-
-type FilterTipo = '' | 'individual' | 'conjunto'
-type FilterPessoa = '' | Pessoa
 
 type Repeticao = 'unico' | 'parcelado' | 'recorrente'
 
@@ -33,13 +32,11 @@ const EMPTY_FORM = {
 }
 type FormState = typeof EMPTY_FORM
 
-export function DespesasPage({ competencia }: Props) {
+export function DespesasPage({ competencia, filters }: Props) {
   const [rows, setRows] = useState<LancamentoRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filterTipo, setFilterTipo] = useState<FilterTipo>('')
-  const [filterPessoa, setFilterPessoa] = useState<FilterPessoa>('')
-  const [filterCategoria, setFilterCategoria] = useState<string>('')
+  const [share, setShare] = useState<ShareData | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, data: todayISO() })
   const [saving, setSaving] = useState(false)
@@ -54,12 +51,14 @@ export function DespesasPage({ competencia }: Props) {
   function fetchList() {
     setLoading(true)
     setError(null)
-    lancamentos
-      .list({ competencia })
-      .then((r) => {
-        // Ordenação local por data desc (mais novo primeiro), tie-break por descricao
+    Promise.all([
+      lancamentos.list({ competencia }),
+      getShare(competencia).catch(() => null),
+    ])
+      .then(([r, s]) => {
         r.sort((a, b) => (b.data || '').localeCompare(a.data || '') || a.descricao.localeCompare(b.descricao, 'pt-BR'))
         setRows(r)
+        setShare(s)
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
@@ -70,21 +69,32 @@ export function DespesasPage({ competencia }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competencia])
 
+  /** Aplica filtros globais à lista. Lógica:
+   *  - tipo: match exato se setado
+   *  - pessoa: 'casal' = tudo; pessoa específica = individuais.dono=pessoa + todas conjuntas
+   *  - categoria: match exato se setado
+   */
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (filterTipo && r.tipo !== filterTipo) return false
-      if (filterPessoa) {
-        if (r.tipo === 'individual') {
-          if (r.dono !== filterPessoa) return false
-        } else {
-          // Conjunto: aplica filtro de pessoa = pagador
-          if (r.pagador !== filterPessoa) return false
-        }
+      if (filters.tipo && r.tipo !== filters.tipo) return false
+      if (filters.pessoa !== 'casal') {
+        if (r.tipo === 'individual' && r.dono !== filters.pessoa) return false
+        // conjuntas sempre passam quando pessoa é específica
       }
-      if (filterCategoria && r.categoria !== filterCategoria) return false
+      if (filters.categoria && r.categoria !== filters.categoria) return false
       return true
     })
-  }, [rows, filterTipo, filterPessoa, filterCategoria])
+  }, [rows, filters])
+
+  /** Peso aplicado à despesa pro cálculo de totais — só relevante quando pessoa
+   *  é específica e o toggle de rateio está ligado. */
+  function weight(r: LancamentoRow): number {
+    if (filters.pessoa === 'casal') return 1
+    if (r.tipo === 'individual') return 1
+    if (!filters.rateio) return 1
+    if (!share) return 0.5
+    return share[filters.pessoa as 'Bam' | 'Evellyn']
+  }
 
   function openNew() {
     setForm({ ...EMPTY_FORM, data: todayISO() })
@@ -188,8 +198,11 @@ export function DespesasPage({ competencia }: Props) {
     }
   }
 
-  const totalDespesas = filtered.reduce((s, r) => s + (Number(r.valor) || 0), 0)
-  const totalConjuntas = filtered.filter((r) => r.tipo === 'conjunto').reduce((s, r) => s + (Number(r.valor) || 0), 0)
+  const totalDespesas = filtered.reduce((s, r) => s + (Number(r.valor) || 0) * weight(r), 0)
+  const totalConjuntas = filtered
+    .filter((r) => r.tipo === 'conjunto')
+    .reduce((s, r) => s + (Number(r.valor) || 0) * weight(r), 0)
+  const rateadoAtivo = filters.pessoa !== 'casal' && filters.rateio
 
   return (
     <section>
@@ -198,7 +211,11 @@ export function DespesasPage({ competencia }: Props) {
           <h2>Despesas — {formatCompetenciaBR(competencia, 'long')}</h2>
           <p className="muted">
             {filtered.length} lançamento{filtered.length === 1 ? '' : 's'} · total {formatBRL(totalDespesas)}{' '}
-            <span className="muted-light">(conjuntas {formatBRL(totalConjuntas)})</span>
+            <span className="muted-light">
+              {rateadoAtivo
+                ? `(rateado por ${filters.pessoa})`
+                : `(conjuntas ${formatBRL(totalConjuntas)})`}
+            </span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -377,35 +394,6 @@ export function DespesasPage({ competencia }: Props) {
           </div>
         </form>
       )}
-
-      <details className="filters" open>
-        <summary>Filtros</summary>
-        <div className="filters-body">
-          <label>
-            <span>Tipo</span>
-            <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value as FilterTipo)}>
-              <option value="">Todos</option>
-              <option value="conjunto">Só conjuntas</option>
-              <option value="individual">Só individuais</option>
-            </select>
-          </label>
-          <label>
-            <span>Pessoa</span>
-            <select value={filterPessoa} onChange={(e) => setFilterPessoa(e.target.value as FilterPessoa)}>
-              <option value="">Todas</option>
-              <option value="Bam">Bam</option>
-              <option value="Evellyn">Evellyn</option>
-            </select>
-          </label>
-          <label>
-            <span>Categoria</span>
-            <select value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
-              <option value="">Todas</option>
-              {despesaCats.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-            </select>
-          </label>
-        </div>
-      </details>
 
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}

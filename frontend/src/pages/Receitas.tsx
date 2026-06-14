@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { receitas } from '../api/client'
 import type { Pessoa, ReceitaRow } from '../api/types'
+import type { GlobalFilters } from '../components/Filters'
 import { formatBRL, formatCompetenciaBR, parseBRL } from '../lib/format'
 
 interface Props {
   competencia: string
+  filters: GlobalFilters
 }
-
-type FilterPessoa = '' | Pessoa
 
 const EMPTY_FORM = {
   id: '',
@@ -20,11 +20,10 @@ const EMPTY_FORM = {
 }
 type FormState = typeof EMPTY_FORM
 
-export function ReceitasPage({ competencia }: Props) {
+export function ReceitasPage({ competencia, filters }: Props) {
   const [rows, setRows] = useState<ReceitaRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filterPessoa, setFilterPessoa] = useState<FilterPessoa>('')
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, competencia })
   const [saving, setSaving] = useState(false)
@@ -49,9 +48,9 @@ export function ReceitasPage({ competencia }: Props) {
   }, [competencia])
 
   const filtered = useMemo(() => {
-    if (!filterPessoa) return rows
-    return rows.filter((r) => r.pessoa === filterPessoa)
-  }, [rows, filterPessoa])
+    if (filters.pessoa === 'casal') return rows
+    return rows.filter((r) => r.pessoa === filters.pessoa)
+  }, [rows, filters.pessoa])
 
   function openNew() {
     setForm({ ...EMPTY_FORM, competencia })
@@ -224,20 +223,6 @@ export function ReceitasPage({ competencia }: Props) {
           </div>
         </form>
       )}
-
-      <details className="filters" open>
-        <summary>Filtros</summary>
-        <div className="filters-body">
-          <label>
-            <span>Pessoa</span>
-            <select value={filterPessoa} onChange={(e) => setFilterPessoa(e.target.value as FilterPessoa)}>
-              <option value="">Todas</option>
-              <option value="Bam">Bam</option>
-              <option value="Evellyn">Evellyn</option>
-            </select>
-          </label>
-        </div>
-      </details>
 
       {loading && <p className="muted">Carregando…</p>}
       {error && <p className="error-msg">Erro: {error}</p>}

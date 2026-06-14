@@ -294,6 +294,31 @@ main {
   font-size: 0.95rem;
   padding: 0.25rem 0;
 }
+
+/* Filtros globais no header sticky */
+.filters-global {
+  max-width: 720px;
+  margin: 0.5rem auto 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+}
+.filters-global summary {
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.filters-global .filter-label { font-weight: 600; }
+.filters-global .filter-summary {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filters-global .filters-body { padding: 0.4rem 0; }
 .filters-body {
   display: grid;
   grid-template-columns: 1fr 1fr;

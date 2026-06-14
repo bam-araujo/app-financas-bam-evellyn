@@ -13,16 +13,17 @@ import {
   YAxis,
 } from 'recharts'
 import { getShare, lancamentos, receitas } from '../api/client'
-import type { LancamentoRow, Pessoa, ReceitaRow, ShareData } from '../api/types'
+import type { LancamentoRow, ReceitaRow, ShareData } from '../api/types'
+import type { GlobalFilters } from '../components/Filters'
 import { COLOR_BAM, COLOR_EVELLYN, colorForIndex } from '../lib/colors'
 import { shiftCompetencia } from '../lib/competencia'
 import { formatBRL, formatCompetenciaBR } from '../lib/format'
 
-type PessoaFiltro = 'casal' | Pessoa
 type Periodo = 'ytd' | '3m' | '6m' | '12m'
 
 interface Props {
   competencia: string
+  filters: GlobalFilters
 }
 
 function periodoRange(periodo: Periodo, atual: string): { start: string; end: string } {
@@ -49,16 +50,17 @@ function listMonthsInRange(start: string, end: string): string[] {
   return out
 }
 
-export function DashboardPage({ competencia }: Props) {
+export function DashboardPage({ competencia, filters }: Props) {
   const [allLanc, setAllLanc] = useState<LancamentoRow[]>([])
   const [allRec, setAllRec] = useState<ReceitaRow[]>([])
   const [shares, setShares] = useState<Record<string, ShareData>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Período é o único filtro específico do Dashboard (range vs mês único)
   const [periodo, setPeriodo] = useState<Periodo>('ytd')
-  const [pessoa, setPessoa] = useState<PessoaFiltro>('casal')
-  const [rateio, setRateio] = useState(true)  // aplicar share nas conjuntas?
+  const pessoa = filters.pessoa
+  const rateio = filters.rateio
 
   const { start, end } = useMemo(() => periodoRange(periodo, competencia), [periodo, competencia])
   const meses = useMemo(() => listMonthsInRange(start, end), [start, end])
@@ -87,15 +89,18 @@ export function DashboardPage({ competencia }: Props) {
 
   /** Peso aplicado a uma despesa, dado filtro pessoa + toggle rateio. 0 = excluir. */
   function weight(row: LancamentoRow): number {
+    // Aplica tipo+categoria globais primeiro
+    if (filters.tipo && row.tipo !== filters.tipo) return 0
+    if (filters.categoria && row.categoria !== filters.categoria) return 0
     if (pessoa === 'casal') return 1
     // pessoa específica
     if (row.tipo === 'individual') {
       return row.dono === pessoa ? 1 : 0
     }
     // conjunto
-    if (!rateio) return 1  // valor cheio em todas as conjuntas
+    if (!rateio) return 1
     const s = shares[row.competencia]
-    if (!s) return 0.5  // share desconhecido para a competência: assume 50/50
+    if (!s) return 0.5
     return s[pessoa]
   }
 
@@ -105,7 +110,7 @@ export function DashboardPage({ competencia }: Props) {
       .map((r) => ({ row: r, w: weight(r) }))
       .filter((x) => x.w > 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allLanc, start, end, pessoa, rateio, shares])
+  }, [allLanc, start, end, pessoa, rateio, shares, filters.tipo, filters.categoria])
 
   const receitasFiltradas = useMemo(() => {
     return allRec.filter((r) => inRange(r.competencia, start, end))
@@ -195,25 +200,7 @@ export function DashboardPage({ competencia }: Props) {
               <option value="12m">Últimos 12 meses</option>
             </select>
           </label>
-          <label>
-            <span>Pessoa</span>
-            <select value={pessoa} onChange={(e) => setPessoa(e.target.value as PessoaFiltro)}>
-              <option value="casal">Casal (total)</option>
-              <option value="Bam">Bam</option>
-              <option value="Evellyn">Evellyn</option>
-            </select>
-          </label>
         </div>
-        {pessoa !== 'casal' && (
-          <label className="checkbox-label" style={{ marginTop: '0.5rem' }}>
-            <input
-              type="checkbox"
-              checked={rateio}
-              onChange={(e) => setRateio(e.target.checked)}
-            />
-            <span>Ratear conjuntas pelo share da competência (consumo efetivo)</span>
-          </label>
-        )}
       </div>
 
       {loading && <p className="muted">Carregando…</p>}

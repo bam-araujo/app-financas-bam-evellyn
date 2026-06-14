@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ping } from './api/client'
 import { CompetenciaSelector } from './components/CompetenciaSelector'
+import { DEFAULT_FILTERS, Filters, type GlobalFilters } from './components/Filters'
 import { Tabs } from './components/Tabs'
 import { useHashRoute } from './hooks/useHashRoute'
 import { currentCompetencia } from './lib/competencia'
@@ -25,6 +26,7 @@ const TABS = [
 export default function App() {
   const [conn, setConn] = useState<ConnStatus>({ kind: 'loading' })
   const [competencia, setCompetencia] = useState<string>(currentCompetencia())
+  const [filters, setFilters] = useState<GlobalFilters>(DEFAULT_FILTERS)
   const [route, navigate] = useHashRoute('despesas')
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function App() {
           <ConnDot status={conn} />
         </div>
         <CompetenciaSelector value={competencia} onChange={setCompetencia} />
+        <Filters value={filters} onChange={setFilters} />
         <Tabs tabs={TABS} current={route} onChange={navigate} />
       </header>
 
@@ -48,10 +51,10 @@ export default function App() {
         {conn.kind === 'error' && (
           <p className="error-msg">Sem conexão com a API: {conn.message}</p>
         )}
-        {route === 'despesas' && <DespesasPage competencia={competencia} />}
-        {route === 'receitas' && <ReceitasPage competencia={competencia} />}
+        {route === 'despesas' && <DespesasPage competencia={competencia} filters={filters} />}
+        {route === 'receitas' && <ReceitasPage competencia={competencia} filters={filters} />}
         {route === 'acerto' && <AcertoPage competencia={competencia} />}
-        {route === 'dashboard' && <DashboardPage competencia={competencia} />}
+        {route === 'dashboard' && <DashboardPage competencia={competencia} filters={filters} />}
         {route === 'importar' && <ImportarPage />}
         {!['despesas', 'receitas', 'acerto', 'dashboard', 'importar'].includes(route) && (
           <p className="muted">Página desconhecida.</p>
