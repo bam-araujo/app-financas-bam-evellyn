@@ -10,16 +10,34 @@ export function formatBRL(value: number): string {
   return BRL.format(value)
 }
 
-/** Converte "1.234,56" ou "1234.56" ou "1234,56" em number. Aceita também `number`. */
+/**
+ * Converte texto BR/US em number. Aceita também `number`.
+ * Regras:
+ *  - se tem `.` e `,`, o ÚLTIMO é o decimal; o outro é separador de milhar
+ *  - se tem só `,` → decimal BR ("100,50" → 100.5)
+ *  - se tem só `.` → decimal US ("100.50" → 100.5)
+ *  - "1.234,56" → 1234.56 / "1,234.56" → 1234.56
+ *  - aceita "R$" e espaços
+ */
 export function parseBRL(input: string | number): number {
   if (typeof input === 'number') return input
   if (!input) return 0
-  const cleaned = input
-    .replace(/\s/g, '')
-    .replace(/R\$/i, '')
-    .replace(/\./g, '')
-    .replace(',', '.')
-  const n = Number(cleaned)
+  let s = String(input).replace(/\s/g, '').replace(/R\$/i, '')
+  const lastComma = s.lastIndexOf(',')
+  const lastDot = s.lastIndexOf('.')
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      // BR: 1.234,56 → tira pontos, troca vírgula por ponto
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else {
+      // US: 1,234.56 → tira vírgulas
+      s = s.replace(/,/g, '')
+    }
+  } else if (lastComma >= 0) {
+    s = s.replace(',', '.')
+  }
+  // se só tem ponto, fica como está (decimal US)
+  const n = Number(s)
   return isFinite(n) ? n : 0
 }
 
