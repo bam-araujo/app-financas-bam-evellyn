@@ -21,6 +21,23 @@ function dupeKey(data: string, valor: number): string {
   return `${data}|${valor.toFixed(2)}`
 }
 
+/**
+ * Infere pessoa (Bam/Evellyn) a partir do titular da fatura. Cartão de
+ * crédito é pessoal — pagador e dono são quem está no nome da fatura,
+ * NÃO o usuário logado (importar a fatura da Evellyn estando logado como
+ * Bam é caso comum: o Ivan importa a fatura da esposa).
+ *
+ * Heurística por primeiro nome / apelido — funciona pros nomes desse casal.
+ * Se quiser estender (terceiros, mudança de apelido), adicionar uma coluna
+ * `aliases` na tabela `pessoas` e plugar aqui.
+ */
+function inferPessoaFromTitular(titular: string, fallback: Pessoa): Pessoa {
+  if (!titular) return fallback
+  if (/\bevellyn\b|\beve\b/i.test(titular)) return 'Evellyn'
+  if (/\bivan\b|\bbam\b/i.test(titular)) return 'Bam'
+  return fallback
+}
+
 interface Props {
   me: WhoamiData | null
 }
@@ -68,6 +85,10 @@ export function ImportarPage({ me }: Props) {
         throw new Error(`Nenhuma transação encontrada — o PDF parece não ser uma fatura ${BANKS[bank].label}.`)
       }
       const venc = result.meta.vencimento || ''
+      // Prefill de pagador/dono baseado no TITULAR da fatura, não no usuário
+      // logado. Importar a fatura da Evellyn estando logado como Bam é caso
+      // comum — sem isso, dono ficaria errado pra todas as linhas.
+      const ownerFromFatura = inferPessoaFromTitular(result.meta.titular || '', (me?.nome as Pessoa) || 'Bam')
       const initial: LineState[] = result.transactions.map((tx) => {
         const detectouParcela = !!(tx.parcela_num && tx.parcela_total)
         const descTxt = detectouParcela
@@ -80,12 +101,10 @@ export function ImportarPage({ me }: Props) {
           // pode trocar antes de salvar).
           categoria: autoCat.suggest(descTxt),
           valor_input: tx.valor > 0 ? String(tx.valor).replace('.', ',') : '',
-          // Prefill pagador com o usuário logado (faturas geralmente são da própria pessoa).
-          pagador: (me?.nome as Pessoa) || 'Bam',
-          // Cartão é pessoal — default individual com dono = logged user.
-          // Conjuntas dentro da fatura são exceção; usuário marca manualmente.
+          // Pagador e dono = titular da fatura (cartão é pessoal).
+          pagador: ownerFromFatura,
           tipo: 'individual',
-          dono: (me?.nome as Pessoa) || 'Bam',
+          dono: ownerFromFatura,
           // Se o parser detectou parcela, pré-marca como parcelado com total
           // de parcelas restantes (parcela_total - parcela_num + 1) — assim
           // o import cria essa parcela + as próximas N que ainda não vieram.
@@ -333,6 +352,11 @@ export function ImportarPage({ me }: Props) {
               {parsed.meta.vencimento && <> · venc <strong>{formatDateBR(parsed.meta.vencimento)}</strong></>}
               {parsed.meta.total > 0 && <> · total fatura <strong>{formatBRL(parsed.meta.total)}</strong></>}
             </p>
+            {parsed.meta.titular && (
+              <p className="muted-light" style={{ fontSize: '0.78rem', margin: '0.25rem 0 0' }}>
+                Pagador e dono pré-preenchidos como <strong>{inferPessoaFromTitular(parsed.meta.titular, (me?.nome as Pessoa) || 'Bam')}</strong> (titular da fatura). Confira em cada linha.
+              </p>
+            )}
             <p className="muted">
               {selectedLines.length}/{lines.length} selecionado{selectedLines.length === 1 ? '' : 's'} · soma {formatBRL(total)}
               {Math.abs(total - parsed.meta.total) > 0.05 && parsed.meta.total > 0 && (
