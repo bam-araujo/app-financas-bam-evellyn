@@ -29,3 +29,7 @@ backend/_bootstrap.js
 
 # Token temporário de setup — NUNCA commitar
 .token-temp
+
+# PDFs/CSVs reais usados pra calibrar parsers de fatura — contêm dados
+# sensíveis (CPF, número de cartão, valores). Nunca commitar.
+samples/

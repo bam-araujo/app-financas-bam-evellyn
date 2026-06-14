@@ -23,32 +23,10 @@
 // x≈350; valor 250 cobre folga em ambos os lados.
 const LEFT_COLUMN_MAX_X = 250
 
-export interface FaturaTransaction {
-  /** Data DD/MM como aparece na fatura. O ano é inferido pela data de vencimento. */
-  data_compra: string                 // YYYY-MM-DD ou '' se não foi possível
-  descricao: string
-  valor: number                       // sempre positivo
-  parcela_num?: number                // se detectada
-  parcela_total?: number
-  raw_line: string
-}
-
-export interface FaturaMeta {
-  vencimento: string                  // YYYY-MM-DD (data do vencimento)
-  total: number                       // total da fatura ('Total desta fatura' / 'Lançamentos no cartão')
-  titular: string
-}
-
-export interface ParsedFatura {
-  meta: FaturaMeta
-  transactions: FaturaTransaction[]
-}
-
-/** Linha com X opcional. Sem X, todas as linhas são tratadas como coluna esquerda (back-compat). */
-export interface LineInput {
-  text: string
-  x?: number
-}
+// Tipos compartilhados pelos parsers vivem em ./types — todo banco devolve
+// o mesmo formato pra UI de Importar ser banco-agnóstica.
+import type { FaturaMeta, FaturaTransaction, LineInput, ParsedFatura } from './types'
+export type { FaturaMeta, FaturaTransaction, LineInput, ParsedFatura }
 
 const RE_DATA_INICIO = /^(\d{2})\/(\d{2})\b/
 const RE_VALOR_FINAL = /(-?\d{1,3}(?:\.\d{3})*,\d{2})$/

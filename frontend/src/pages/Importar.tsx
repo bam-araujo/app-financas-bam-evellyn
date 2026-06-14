@@ -5,7 +5,7 @@ import { useAutoCategorias } from '../hooks/useAutoCategorias'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
 import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
-import { parseItauFatura } from '../lib/parsers/itau-fatura'
+import { BANKS, BANK_ORDER, detectBank, parseFatura, type Bank, type BankSelection } from '../lib/parsers/registry'
 import { importarReducer, initialImportarState, type LineState } from './importarReducer'
 
 /**
@@ -29,6 +29,11 @@ export function ImportarPage({ me }: Props) {
   const [state, dispatch] = useReducer(importarReducer, initialImportarState)
   const { phase, error, parsed, rawLines, lines, saveResult } = state
   const [showOnlyDupes, setShowOnlyDupes] = useState(false)
+  // Banco selecionado no dropdown. 'auto' = roda detectBank() pelas linhas
+  // extraídas e decide; específico = ignora detecção e usa o parser pedido.
+  const [bankSel, setBankSel] = useState<BankSelection>('auto')
+  // Banco efetivamente usado no último parse (mostrado no resumo da fatura).
+  const [bankUsed, setBankUsed] = useState<Bank | null>(null)
 
   const cats = useCategorias()
   const despesaCats = useMemo(
@@ -44,9 +49,23 @@ export function ImportarPage({ me }: Props) {
     try {
       const linesMeta = await extractPdfLinesWithMeta(file)
       const rawLines = linesMeta.map((l) => l.text)
-      const result = parseItauFatura(linesMeta.map((l) => ({ text: l.text, x: l.x })))
+      const lineInputs = linesMeta.map((l) => ({ text: l.text, x: l.x }))
+      // Resolve qual parser usar. Auto = detecção pela assinatura do emissor;
+      // explícito = respeita a escolha do usuário (útil quando detect falha).
+      let bank: Bank
+      if (bankSel === 'auto') {
+        const detected = detectBank(lineInputs)
+        if (!detected) {
+          throw new Error('Não consegui detectar o banco automaticamente — escolha manualmente no dropdown acima.')
+        }
+        bank = detected
+      } else {
+        bank = bankSel
+      }
+      setBankUsed(bank)
+      const result = parseFatura(bank, lineInputs)
       if (result.transactions.length === 0) {
-        throw new Error('Nenhuma transação encontrada — o PDF parece não ser uma fatura Itaú.')
+        throw new Error(`Nenhuma transação encontrada — o PDF parece não ser uma fatura ${BANKS[bank].label}.`)
       }
       const venc = result.meta.vencimento || ''
       const initial: LineState[] = result.transactions.map((tx) => {
@@ -239,7 +258,7 @@ export function ImportarPage({ me }: Props) {
         <div>
           <h2>Importar fatura</h2>
           <p className="muted">
-            Sobe o PDF da fatura do cartão Itaú. Parser roda no celular — o arquivo não vai pro servidor.
+            Sobe o PDF da fatura do cartão. Parser roda no celular — o arquivo não vai pro servidor.
           </p>
         </div>
         <button
@@ -259,6 +278,21 @@ export function ImportarPage({ me }: Props) {
 
       {phase === 'idle' && (
         <div className="card">
+          <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+            <span style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Banco</span>
+            <select
+              value={bankSel}
+              onChange={(e) => setBankSel(e.target.value as BankSelection)}
+              style={{ width: '100%' }}
+            >
+              <option value="auto">Detectar automaticamente</option>
+              {BANK_ORDER.map((id) => (
+                <option key={id} value={id}>
+                  {BANKS[id].label}{BANKS[id].pending ? ' (em breve — precisa de PDF de exemplo)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="upload">
             <input type="file" accept="application/pdf,.pdf" onChange={onFile} />
             <span>Selecionar PDF da fatura</span>
@@ -295,7 +329,7 @@ export function ImportarPage({ me }: Props) {
         <>
           <div className="card">
             <p>
-              Fatura: <strong>{parsed.meta.titular || 'Itaú'}</strong>
+              Fatura {bankUsed && <span className="muted-light">({BANKS[bankUsed].label})</span>}: <strong>{parsed.meta.titular || (bankUsed ? BANKS[bankUsed].label : '—')}</strong>
               {parsed.meta.vencimento && <> · venc <strong>{formatDateBR(parsed.meta.vencimento)}</strong></>}
               {parsed.meta.total > 0 && <> · total fatura <strong>{formatBRL(parsed.meta.total)}</strong></>}
             </p>

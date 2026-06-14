@@ -120,8 +120,13 @@ frontend/
       greeting.ts                 # saudação por horário
       rateio.ts                   # peso de lançamento conjunto pra rateio
       parsers/
-        itau-fatura.ts            # parser Itaú PDF
-        pdf-extract.ts            # pdf.js wrapper
+        types.ts                  # tipos compartilhados (LineInput, ParsedFatura, etc.)
+        registry.ts               # ◆ BANKS map + detectBank + parseFatura (dispatcher por banco)
+        pdf-extract.ts            # pdf.js wrapper (banco-agnóstico, extrai texto + X/Y)
+        itau-fatura.ts            # parser Itaú PDF (implementado)
+        nubank-fatura.ts          # STUB — precisa de samples/nubank-*.pdf
+        santander-fatura.ts       # STUB — precisa de samples/santander-*.pdf
+        mercadopago-fatura.ts     # STUB — precisa de samples/mercadopago-*.pdf
     pages/
       Acerto.tsx                  # acerto + marcar pago (acertos_pagos)
       Dashboard.tsx               # Home: progressive load (lists → shares background)
@@ -326,6 +331,20 @@ Use `makeTableApi('nome_tabela').list/get/create/update/remove` em vez de chamad
 2. Rodar `initSchema()` no editor Apps Script pra criar a aba — OU deixar que `getOrCreateSheet_` crie sob demanda na primeira request.
 3. Adicionar tipo em `frontend/src/api/types.ts`.
 4. Exportar `makeTableApi('nome')` em `frontend/src/api/client.ts`.
+
+### Adicionar parser de fatura de um banco novo
+
+Padrão estabelecido em [parsers/registry.ts](frontend/src/lib/parsers/registry.ts). Pra suportar um banco novo:
+
+1. **Obter sample real**: pelo menos 1 PDF da fatura desse banco em `samples/<banco>-*.pdf` (gitignored — nunca subir). Sem isso, qualquer parser será um chute.
+2. **Criar parser** `parsers/<banco>-fatura.ts` exportando `parse<Banco>Fatura(lines: LineInput[]): ParsedFatura`. Usar [itau-fatura.ts](frontend/src/lib/parsers/itau-fatura.ts) como referência da forma final (extrai meta de vencimento/total, identifica bloco de lançamentos, regex de data/valor/parcela, filtra coluna direita por X).
+3. **Registrar** em [registry.ts](frontend/src/lib/parsers/registry.ts):
+   - Adicionar entrada em `BANKS` com `id`, `label`, `detect` (regex de assinatura do emissor — específica pra evitar falso positivo), `parse` (a função do passo 2).
+   - Adicionar `id` ao tipo `Bank` e a `BANK_ORDER`.
+   - Remover `pending: true` (era stub).
+4. UI de Importar já consome o registry — banco novo aparece no dropdown automaticamente.
+
+Calibração de regex: prefira frases únicas do emissor (nome legal, slogan, label de seção tipo "Total a pagar"). Coordenada X é útil pra ignorar coluna de encargos — inspecione via `getLastExtractionDebug()` que armazena tudo em memória após o último parse.
 
 ### Adicionar série (parcelado/recorrente) a uma tabela existente
 
