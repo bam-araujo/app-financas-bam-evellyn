@@ -121,86 +121,8 @@ export function ReceitasPage({ competencia, filters, me }: Props) {
         </button>
       </header>
 
-      {formOpen && (
-        <form className="card form" onSubmit={submit}>
-          <h3>{form.id ? 'Editar receita' : 'Nova receita'}</h3>
-
-          <label>
-            <span>Competência</span>
-            <input
-              type="month"
-              value={form.competencia}
-              onChange={(e) => setForm({ ...form, competencia: e.target.value })}
-            />
-          </label>
-
-          <label>
-            <span>Pessoa</span>
-            <div className="seg-group">
-              {(['Bam', 'Evellyn'] as Pessoa[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  className={'seg' + (form.pessoa === p ? ' seg-active' : '')}
-                  onClick={() => setForm({ ...form, pessoa: p })}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </label>
-
-          <label>
-            <span>Tipo</span>
-            <select
-              value={form.tipo}
-              onChange={(e) => setForm({ ...form, tipo: e.target.value as FormState['tipo'] })}
-            >
-              <option value="salario">Salário</option>
-              <option value="bonus">Bônus</option>
-              <option value="promocao">Promoção</option>
-              <option value="outro">Outro</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Origem (empresa, fonte, etc.)</span>
-            <input
-              type="text"
-              value={form.origem}
-              maxLength={120}
-              onChange={(e) => setForm({ ...form, origem: e.target.value })}
-            />
-          </label>
-
-          <label>
-            <span>Valor</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0,00"
-              value={form.valor}
-              onChange={(e) => setForm({ ...form, valor: e.target.value })}
-            />
-          </label>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={form.conta_para_share}
-              onChange={(e) => setForm({ ...form, conta_para_share: e.target.checked })}
-            />
-            <span>Contar para o cálculo de share (rateio)</span>
-          </label>
-
-          {formError && <p className="error-msg">{formError}</p>}
-
-          <div className="form-actions">
-            <button type="button" className="btn" onClick={closeForm} disabled={saving}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
-          </div>
-        </form>
-      )}
+      {/* Form de CRIAÇÃO no topo. Edição inline via renderAfterRow. */}
+      {formOpen && !form.id && renderForm()}
 
       <EntityList
         loading={loading}
@@ -210,6 +132,7 @@ export function ReceitasPage({ competencia, filters, me }: Props) {
         itemKey={(r) => r.id}
         onEdit={editFromRow}
         onDelete={remove}
+        renderAfterRow={(r) => (formOpen && form.id === r.id ? renderForm() : null)}
         renderRow={(r) => (
           <>
             <div className="row-top">
@@ -225,4 +148,87 @@ export function ReceitasPage({ competencia, filters, me }: Props) {
       />
     </section>
   )
+
+  function renderForm() {
+    return (
+      <form className="card form" onSubmit={submit}>
+        <h3>{form.id ? 'Editar receita' : 'Nova receita'}</h3>
+
+        <label>
+          <span>Competência</span>
+          <input
+            type="month"
+            value={form.competencia}
+            onChange={(e) => setForm({ ...form, competencia: e.target.value })}
+          />
+        </label>
+
+        <label>
+          <span>Pessoa</span>
+          <div className="seg-group">
+            {(['Bam', 'Evellyn'] as Pessoa[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={'seg' + (form.pessoa === p ? ' seg-active' : '')}
+                onClick={() => setForm({ ...form, pessoa: p })}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </label>
+
+        <label>
+          <span>Tipo</span>
+          <select
+            value={form.tipo}
+            onChange={(e) => setForm({ ...form, tipo: e.target.value as FormState['tipo'] })}
+          >
+            <option value="salario">Salário</option>
+            <option value="bonus">Bônus</option>
+            <option value="promocao">Promoção</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Origem (empresa, fonte, etc.)</span>
+          <input
+            type="text"
+            value={form.origem}
+            maxLength={120}
+            onChange={(e) => setForm({ ...form, origem: e.target.value })}
+          />
+        </label>
+
+        <label>
+          <span>Valor</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={form.valor}
+            onChange={(e) => setForm({ ...form, valor: e.target.value })}
+          />
+        </label>
+
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={form.conta_para_share}
+            onChange={(e) => setForm({ ...form, conta_para_share: e.target.checked })}
+          />
+          <span>Contar para o cálculo de share (rateio)</span>
+        </label>
+
+        {formError && <p className="error-msg">{formError}</p>}
+
+        <div className="form-actions">
+          <button type="button" className="btn" onClick={closeForm} disabled={saving}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </form>
+    )
+  }
 }

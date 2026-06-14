@@ -121,7 +121,9 @@ export function DespesasPage({ competencia, filters, me }: Props) {
       if (!form.pagador) return 'pagador obrigatório'
       if (!form.tipo) return 'tipo obrigatório'
       if (form.tipo === 'individual' && !form.dono) return 'dono obrigatório quando tipo=individual'
-      if (!form.id && form.repeticao === 'parcelado') {
+      // Parcelas: validar quando criar OU converter standalone em parcelado.
+      const isConverting = form.id && !form.edit_serie_tipo && form.repeticao === 'parcelado'
+      if ((!form.id || isConverting) && form.repeticao === 'parcelado') {
         if (!form.parcelas || form.parcelas < 2) return 'nº de parcelas deve ser >= 2'
         if (form.parcelas > 60) return 'nº de parcelas muito alto (máx 60)'
       }
@@ -158,8 +160,32 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         if (scope === null) throw new Error('cancelado')
         const payload = { ...base, competencia: competenciaFromDate(form.data) }
         await updateSerieForward(form.id, scope, payload)
+      } else if (form.id && form.repeticao !== 'unico') {
+        // CONVERSÃO: linha standalone virou parcelado/recorrente.
+        // Estratégia: deleta original + cria série nova (a primeira linha
+        // da série fica com a data do form, então o histórico fica coerente).
+        const confirmed = await openDialog<'go'>({
+          title: 'Converter em ' + (form.repeticao === 'parcelado' ? 'parcelado' : 'recorrente') + '?',
+          message: (
+            <>
+              Vou apagar essa linha e criar uma nova série a partir dela.
+              Os dados (descrição, valor, categoria, etc.) viram base pra todas
+              as linhas geradas. Continuar?
+            </>
+          ),
+          choices: [
+            { label: 'Sim, converter', value: 'go', primary: true },
+          ],
+        })
+        if (confirmed === null) throw new Error('cancelado')
+        await lancamentos.remove(form.id)
+        if (form.repeticao === 'parcelado') {
+          await createSerieParcelado(base, form.parcelas)
+        } else {
+          await createSerieRecorrente(base)
+        }
       } else if (form.id) {
-        // Edit linha standalone
+        // Edit linha standalone, sem conversão.
         await lancamentos.update(form.id, { ...base, competencia: competenciaFromDate(form.data) })
       } else if (form.repeticao === 'parcelado') {
         await createSerieParcelado(base, form.parcelas)
@@ -294,9 +320,59 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         </div>
       </header>
 
-      {formOpen && (
-        <form className="card form" onSubmit={submit}>
-          <h3>{form.id ? 'Editar despesa' : 'Nova despesa'}</h3>
+      {/* Form de CRIAÇÃO no topo. Edição é renderizada inline na EntityList
+          via renderAfterRow pra ficar perto da linha clicada. */}
+      {formOpen && !form.id && renderForm()}
+
+      <EntityList
+        loading={loading}
+        error={error}
+        emptyMsg={`Nenhum lançamento para ${formatCompetenciaBR(competencia, 'long')}.`}
+        items={filtered}
+        itemKey={(r) => r.id}
+        onEdit={editFromRow}
+        onDelete={remove}
+        renderAfterRow={(r) => (formOpen && form.id === r.id ? renderForm() : null)}
+        renderRow={(r) => (
+          <>
+            <div className="row-top">
+              <strong>
+                {r.descricao}
+                {r.serie_tipo === 'parcelado' && (
+                  <span className="badge" title={`Parcela ${r.parcela_num} de ${r.parcela_total}`}>
+                    {r.parcela_num}/{r.parcela_total}
+                  </span>
+                )}
+                {r.serie_tipo === 'recorrente' && (
+                  <span className="badge" title="Lançamento recorrente">↻</span>
+                )}
+              </strong>
+              <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
+            </div>
+            <div className="row-meta">
+              <span>{formatDateBR(r.data)}</span>
+              <span>· {r.categoria}</span>
+              <span>· {r.tipo === 'conjunto' ? 'conjunta' : `${r.dono}`}</span>
+              <span>· pagou {r.pagador}</span>
+            </div>
+          </>
+        )}
+      />
+
+      <ConfirmDialog
+        open={!!dialogState}
+        title={dialogState?.title || ''}
+        message={dialogState?.message}
+        options={dialogState?.options || []}
+        onClose={() => dialogState?.onClose()}
+      />
+    </section>
+  )
+
+  function renderForm() {
+    return (
+      <form className="card form" onSubmit={submit}>
+        <h3>{form.id ? 'Editar despesa' : 'Nova despesa'}</h3>
 
           <label>
             <span>Data</span>
@@ -397,7 +473,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </label>
           )}
 
-          {!form.id && (
+          {!form.edit_serie_tipo && (
             <label>
               <span>Repetição</span>
               <div className="seg-group">
@@ -426,7 +502,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </label>
           )}
 
-          {!form.id && form.repeticao === 'parcelado' && (
+          {!form.edit_serie_tipo && form.repeticao === 'parcelado' && (
             <label>
               <span>Nº de parcelas (valor digitado = valor de UMA parcela)</span>
               <input
@@ -440,10 +516,18 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </label>
           )}
 
-          {!form.id && form.repeticao === 'recorrente' && (
+          {!form.edit_serie_tipo && form.repeticao === 'recorrente' && (
             <p className="hint">
-              Cria 24 lançamentos pra começar; conforme o tempo passa, o app
-              estende automaticamente pra manter sempre os próximos 12 meses cobertos.
+              {form.id
+                ? 'Vai apagar essa linha e criar uma série recorrente baseada nela. Conforme o tempo passa, o app estende automaticamente.'
+                : 'Cria 24 lançamentos pra começar; conforme o tempo passa, o app estende automaticamente pra manter sempre os próximos 12 meses cobertos.'}
+            </p>
+          )}
+
+          {form.id && !form.edit_serie_tipo && form.repeticao === 'parcelado' && (
+            <p className="hint">
+              Vai apagar essa linha e criar {form.parcelas} parcelas mensais
+              a partir da data acima. Valor digitado = valor de UMA parcela.
             </p>
           )}
 
@@ -457,56 +541,13 @@ export function DespesasPage({ competencia, filters, me }: Props) {
             </p>
           )}
 
-          {formError && <p className="error-msg">{formError}</p>}
+        {formError && <p className="error-msg">{formError}</p>}
 
-          <div className="form-actions">
-            <button type="button" className="btn" onClick={closeForm} disabled={saving}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
-          </div>
-        </form>
-      )}
-
-      <EntityList
-        loading={loading}
-        error={error}
-        emptyMsg={`Nenhum lançamento para ${formatCompetenciaBR(competencia, 'long')}.`}
-        items={filtered}
-        itemKey={(r) => r.id}
-        onEdit={editFromRow}
-        onDelete={remove}
-        renderRow={(r) => (
-          <>
-            <div className="row-top">
-              <strong>
-                {r.descricao}
-                {r.serie_tipo === 'parcelado' && (
-                  <span className="badge" title={`Parcela ${r.parcela_num} de ${r.parcela_total}`}>
-                    {r.parcela_num}/{r.parcela_total}
-                  </span>
-                )}
-                {r.serie_tipo === 'recorrente' && (
-                  <span className="badge" title="Lançamento recorrente">↻</span>
-                )}
-              </strong>
-              <span className="row-valor">{formatBRL(Number(r.valor) || 0)}</span>
-            </div>
-            <div className="row-meta">
-              <span>{formatDateBR(r.data)}</span>
-              <span>· {r.categoria}</span>
-              <span>· {r.tipo === 'conjunto' ? 'conjunta' : `${r.dono}`}</span>
-              <span>· pagou {r.pagador}</span>
-            </div>
-          </>
-        )}
-      />
-
-      <ConfirmDialog
-        open={!!dialogState}
-        title={dialogState?.title || ''}
-        message={dialogState?.message}
-        options={dialogState?.options || []}
-        onClose={() => dialogState?.onClose()}
-      />
-    </section>
-  )
+        <div className="form-actions">
+          <button type="button" className="btn" onClick={closeForm} disabled={saving}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </form>
+    )
+  }
 }
