@@ -71,12 +71,17 @@ async function fetchTransient(input: string, init?: RequestInit): Promise<Respon
   }
 }
 
-/** GET de baixo nível — usado por list/get. */
+/** GET de baixo nível — usado por list/get.
+ *  `cache: 'no-store'` força bypass do HTTP cache do navegador. Apps Script
+ *  Web App nem sempre devolve Cache-Control: no-store, e sem isso o Chrome
+ *  pode reusar a resposta GET por heurística — causando leitura stale logo
+ *  após um update (sintoma: edita descrição em Despesas, Acerto continua
+ *  mostrando descrição antiga até refresh forçado). */
 async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
   const { url } = assertConfigured()
   const qs = new URLSearchParams({ action, ...authParams(action), ...params })
   return withRetry(async () => {
-    const res = await fetchTransient(`${url}?${qs.toString()}`, { method: 'GET' })
+    const res = await fetchTransient(`${url}?${qs.toString()}`, { method: 'GET', cache: 'no-store' })
     return unwrap<T>(res)
   })
 }
@@ -87,6 +92,7 @@ async function apiPost<T>(action: string, body: Record<string, unknown> = {}): P
   return withRetry(async () => {
     const res = await fetchTransient(url, {
       method: 'POST',
+      cache: 'no-store',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...authParams(action), ...body }),
     })
