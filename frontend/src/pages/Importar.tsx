@@ -3,7 +3,7 @@ import { batchCreate, createSerieParcelado, createSerieRecorrente } from '../api
 import type { CreatePayload, Pessoa } from '../api/types'
 import { useCategorias } from '../hooks/useCategorias'
 import { formatBRL, formatDateBR, parseBRL } from '../lib/format'
-import { extractPdfLines, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
+import { extractPdfLinesWithMeta, getLastExtractionDebug } from '../lib/parsers/pdf-extract'
 import { type ParsedFatura, parseItauFatura } from '../lib/parsers/itau-fatura'
 
 type LineState = {
@@ -47,9 +47,9 @@ export function ImportarPage() {
     setSaveResult(null)
     setPhase('parsing')
     try {
-      const linesText = await extractPdfLines(file)
-      setRawLines(linesText)
-      const result = parseItauFatura(linesText)
+      const linesMeta = await extractPdfLinesWithMeta(file)
+      setRawLines(linesMeta.map((l) => l.text))
+      const result = parseItauFatura(linesMeta.map((l) => ({ text: l.text, x: l.x })))
       if (result.transactions.length === 0) {
         throw new Error('Nenhuma transação encontrada — o PDF parece não ser uma fatura Itaú.')
       }

@@ -1,7 +1,7 @@
 /**
  * Parser da fatura PDF do cartão Itaú.
  *
- * Entrada: lista de linhas de texto extraídas do PDF (na ordem visual top-down).
+ * Entrada: lista de linhas extraídas do PDF (com coordenadas X opcionais).
  * Saída: lista de transações ({ data_compra, descricao, valor, parcela?, parcela_total? })
  *        + metadata da fatura ({ vencimento, total }).
  *
@@ -11,11 +11,17 @@
  *  - Linha de transação: começa com DD/MM seguido de descrição e termina em VALOR.
  *  - DD/DD no meio (último, antes do valor) = parcela atual/total. Vai pra
  *    descrição como "(N/M)".
- *  - Linhas sem data são continuação da descrição da transação anterior
- *    (subtítulo/categoria/cidade) — anexadas com espaço.
+ *  - Linhas sem data são continuação (cidade/categoria) — só se estiverem na
+ *    coluna esquerda (X < LEFT_COLUMN_MAX_X). Lixo da coluna direita (encargos,
+ *    limites etc.) é ignorado.
  *  - "PAGAMENTO DEB AUTOMATIC" e tudo dentro de "Compras parceladas — próximas
  *    faturas" é ignorado.
  */
+
+// Linhas que começam em X >= isso são consideradas coluna direita e ignoradas
+// pelo parser. Na fatura Itaú, coluna esquerda começa em x≈133 e direita em
+// x≈350; valor 250 cobre folga em ambos os lados.
+const LEFT_COLUMN_MAX_X = 250
 
 export interface FaturaTransaction {
   /** Data DD/MM como aparece na fatura. O ano é inferido pela data de vencimento. */
@@ -36,6 +42,12 @@ export interface FaturaMeta {
 export interface ParsedFatura {
   meta: FaturaMeta
   transactions: FaturaTransaction[]
+}
+
+/** Linha com X opcional. Sem X, todas as linhas são tratadas como coluna esquerda (back-compat). */
+export interface LineInput {
+  text: string
+  x?: number
 }
 
 const RE_DATA_INICIO = /^(\d{2})\/(\d{2})\b/
@@ -73,24 +85,25 @@ function inferYear(vencISO: string, dataMM: string): number {
 /**
  * Lê a metadata da fatura (vencimento, total, titular) varrendo todas as linhas.
  */
-function extractMeta(lines: string[]): FaturaMeta {
+function extractMeta(lines: LineInput[]): FaturaMeta {
   let vencimento = ''
   let total = 0
   let titular = ''
   for (const line of lines) {
+    const text = line.text
     if (!vencimento) {
-      const m = line.match(RE_VENCIMENTO)
+      const m = text.match(RE_VENCIMENTO)
       if (m) {
         const [d, mo, y] = m[1].split('/')
         vencimento = `${y}-${mo}-${d}`
       }
     }
     if (!titular) {
-      const m = line.match(RE_TITULAR)
+      const m = text.match(RE_TITULAR)
       if (m) titular = m[1].trim()
     }
     if (!total) {
-      const m = line.match(/Total desta fatura\s*([\d.,]+)/i)
+      const m = text.match(/Total desta fatura\s*([\d.,]+)/i)
       if (m) {
         const v = parseValorBR(m[1])
         if (isFinite(v)) total = v
@@ -100,13 +113,18 @@ function extractMeta(lines: string[]): FaturaMeta {
   return { vencimento, total, titular }
 }
 
-export function parseItauFatura(lines: string[]): ParsedFatura {
+/** Aceita string[] (back-compat) ou LineInput[]. */
+export function parseItauFatura(input: string[] | LineInput[]): ParsedFatura {
+  const lines: LineInput[] = (input as unknown[]).map((l) =>
+    typeof l === 'string' ? { text: l } : (l as LineInput),
+  )
   const meta = extractMeta(lines)
 
-  // Acha início da seção "Lançamentos: compras e saques"
+  // Acha início da seção "Lançamentos: compras e saques" (texto que aparece na
+  // esquerda, mas pode chegar em qualquer coluna do extrator — não filtra X aqui).
   let startIdx = -1
   for (let i = 0; i < lines.length; i++) {
-    if (/Lan[çc]amentos:\s*compras\s+e\s+saques/i.test(lines[i])) { startIdx = i + 1; break }
+    if (/Lan[çc]amentos:\s*compras\s+e\s+saques/i.test(lines[i].text)) { startIdx = i + 1; break }
   }
   // Acha fim — primeira ocorrência de qualquer terminator
   const TERMINATORS = [
@@ -117,7 +135,7 @@ export function parseItauFatura(lines: string[]): ParsedFatura {
   let endIdx = lines.length
   if (startIdx >= 0) {
     for (let i = startIdx; i < lines.length; i++) {
-      if (TERMINATORS.some((re) => re.test(lines[i]))) { endIdx = i; break }
+      if (TERMINATORS.some((re) => re.test(lines[i].text))) { endIdx = i; break }
     }
   }
 
@@ -126,8 +144,12 @@ export function parseItauFatura(lines: string[]): ParsedFatura {
 
   let current: FaturaTransaction | null = null
   for (let i = startIdx; i < endIdx; i++) {
-    const raw = lines[i].trim()
+    const line = lines[i]
+    const raw = line.text.trim()
     if (!raw) continue
+    // Ignora qualquer linha da coluna direita (encargos, limites, etc.)
+    // que tenha X conhecido — só lidamos com a coluna de lançamentos.
+    if (line.x !== undefined && line.x >= LEFT_COLUMN_MAX_X) continue
     // ignora linhas de cabeçalho de coluna ou nome do titular
     if (/^DATA\b/i.test(raw)) continue
     if (/^ESTABELECIMENTO\b/i.test(raw)) continue
@@ -179,7 +201,9 @@ export function parseItauFatura(lines: string[]): ParsedFatura {
       }
       txs.push(current)
     } else if (current) {
-      // Continuação da descrição (cidade/categoria sem data)
+      // Continuação da descrição (cidade/categoria sem data) — só anexa se
+      // não parece linha de encargo/juros (defesa extra além do filtro de X).
+      if (/\d+,\d{2}/.test(raw) && /%/.test(raw)) continue
       current.descricao = `${current.descricao} ${raw}`.replace(/\s+/g, ' ').trim()
       current.raw_line = `${current.raw_line} | ${raw}`
     }

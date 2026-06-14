@@ -35,15 +35,29 @@ export interface DebugItem {
   str: string
 }
 
+export interface ExtractedLine {
+  text: string
+  x: number   // x onde a linha COMEÇA na página
+  y: number
+  page: number
+}
+
 let lastDebug: DebugItem[] = []
 export function getLastExtractionDebug(): DebugItem[] {
   return lastDebug
 }
 
+/** API antiga: só os textos, na ordem de leitura (top→bottom em cada página). */
 export async function extractPdfLines(file: File | ArrayBuffer): Promise<string[]> {
+  const r = await extractPdfLinesWithMeta(file)
+  return r.map((l) => l.text)
+}
+
+/** Mesma coisa que extractPdfLines mas carrega x/y/page por linha. */
+export async function extractPdfLinesWithMeta(file: File | ArrayBuffer): Promise<ExtractedLine[]> {
   const data = file instanceof File ? await file.arrayBuffer() : file
   const pdf = await pdfjsLib.getDocument({ data }).promise
-  const allLines: string[] = []
+  const allLines: ExtractedLine[] = []
   lastDebug = []
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p)
@@ -67,23 +81,23 @@ export async function extractPdfLines(file: File | ArrayBuffer): Promise<string[
       }
     }
 
-    groups.sort((a, b) => b.y - a.y) // top-down (Y decresce pra baixo em PDF)
+    groups.sort((a, b) => b.y - a.y) // top-down
     for (const g of groups) {
       g.items.sort((a, b) => a.x - b.x)
-      let buffer: string[] = []
+      let buffer: { x: number; str: string }[] = []
       let prevEnd = -Infinity
       for (const it of g.items) {
         if (it.x - prevEnd > COLUMN_GAP_PT && buffer.length) {
-          const line = buffer.join(' ').replace(/\s+/g, ' ').trim()
-          if (line) allLines.push(line)
+          const line = buffer.map((b) => b.str).join(' ').replace(/\s+/g, ' ').trim()
+          if (line) allLines.push({ text: line, x: buffer[0].x, y: g.y, page: p })
           buffer = []
         }
-        buffer.push(it.str)
+        buffer.push({ x: it.x, str: it.str })
         prevEnd = it.x + it.w
       }
       if (buffer.length) {
-        const line = buffer.join(' ').replace(/\s+/g, ' ').trim()
-        if (line) allLines.push(line)
+        const line = buffer.map((b) => b.str).join(' ').replace(/\s+/g, ' ').trim()
+        if (line) allLines.push({ text: line, x: buffer[0].x, y: g.y, page: p })
       }
     }
   }
