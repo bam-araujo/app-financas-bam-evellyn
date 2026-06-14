@@ -36,6 +36,7 @@ const PUBLIC_ACTIONS = new Set([
   'share',
   'close_share',
   'reopen_share',
+  'batch_create',
 ]);
 
 // Quantos meses materializar quando o lançamento é marcado como recorrente.
@@ -264,6 +265,7 @@ function handle_(e, fromPost) {
       case 'share': return reply_({ ok: true, data: shareForCompetencia_(params) });
       case 'close_share': return reply_({ ok: true, data: withLock_(function () { return closeShare_(params); }) });
       case 'reopen_share': return reply_({ ok: true, data: withLock_(function () { return reopenShare_(params); }) });
+      case 'batch_create': return reply_({ ok: true, data: withLock_(function () { return batchCreate_(params); }) });
     }
     return reply_({ ok: false, error: 'unhandled_action:' + action });
   } catch (err) {
@@ -726,6 +728,62 @@ function reopenShare_(params) {
     if (idx > 0) sh.deleteRow(idx);
   });
   return { competencia: competencia, deleted: rows.length };
+}
+
+/**
+ * Cria várias linhas de uma tabela numa única transação. Retorna lista paralela
+ * de resultados ({ok, data?, error?}) — uma falha individual não derruba o lote.
+ *
+ * params:
+ *   table: string (deve estar na whitelist do SCHEMA)
+ *   items: array de payloads (mesmo formato do create normal)
+ */
+function batchCreate_(params) {
+  var def = assertTable_(params.table);
+  var items = params.items;
+  if (!Array.isArray(items)) throw new Error('items_must_be_array');
+  if (items.length === 0) return { count: 0, results: [] };
+  if (items.length > 500) throw new Error('batch_too_large:max=500');
+
+  var sh = getOrCreateSheet_(params.table);
+  var header = readHeader_(sh);
+  var results = [];
+
+  for (var i = 0; i < items.length; i++) {
+    try {
+      var input = items[i] || {};
+      var row = {};
+      if (def.defaults) Object.keys(def.defaults).forEach(function (k) { row[k] = def.defaults[k]; });
+      def.columns.forEach(function (col) {
+        if (col === 'id') return;
+        if (Object.prototype.hasOwnProperty.call(input, col)) row[col] = input[col];
+      });
+      if (def.derive) def.derive(row);
+      def.required.forEach(function (col) {
+        if (row[col] === undefined || row[col] === null || row[col] === '') {
+          throw new Error('missing_required:' + col);
+        }
+      });
+      def.columns.forEach(function (col) {
+        if (col === 'id') return;
+        if (def.validators && def.validators[col]) {
+          if (row[col] === undefined || row[col] === null) row[col] = '';
+          try { row[col] = def.validators[col](row[col]); }
+          catch (e) { throw new Error('invalid_' + col + ':' + e.message); }
+        }
+      });
+      if (def.crossValidate) def.crossValidate(row);
+      row.id = Utilities.getUuid();
+      var arr = header.map(function (c) { return Object.prototype.hasOwnProperty.call(row, c) ? row[c] : ''; });
+      sh.appendRow(arr);
+      results.push({ ok: true, data: row });
+    } catch (e) {
+      results.push({ ok: false, error: String(e && e.message || e), index: i });
+    }
+  }
+  var okCount = 0;
+  for (var k = 0; k < results.length; k++) if (results[k].ok) okCount++;
+  return { count: okCount, total: items.length, results: results };
 }
 
 function findRowIndex_(sh, id) {

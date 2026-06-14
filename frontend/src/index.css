@@ -409,6 +409,54 @@ main {
   .resumo-grid { grid-template-columns: 1fr; }
 }
 
+/* ========== Importar ================================================ */
+
+.upload {
+  display: block;
+  cursor: pointer;
+  padding: 2rem 1rem;
+  text-align: center;
+  border: 2px dashed var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-card);
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+}
+.upload:hover { background: var(--row-hover); }
+.upload input { display: none; }
+
+.import-rows .import-row { flex-direction: row; }
+.import-row .import-check {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem 0 0 0.75rem;
+}
+.import-row-body {
+  flex: 1;
+  padding: 0.5rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.import-row-off { opacity: 0.55; }
+.import-line {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.import-line .grow { flex: 1; min-width: 8rem; }
+.import-line input, .import-line select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+.import-line .row-valor { font-size: 0.95rem; }
+
 .empty {
   padding: 1.5rem;
   text-align: center;

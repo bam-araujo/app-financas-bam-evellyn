@@ -150,6 +150,21 @@ export function reopenShare(competencia: string): Promise<{ competencia: string;
   return apiPost<{ competencia: string; deleted: number }>('reopen_share', { competencia })
 }
 
+// ====== Batch create ========================================================
+
+export interface BatchCreateResult<T> {
+  count: number
+  total: number
+  results: Array<{ ok: true; data: T } | { ok: false; error: string; index: number }>
+}
+
+export function batchCreate<T extends TableName>(
+  table: T,
+  items: CreatePayload<T>[],
+): Promise<BatchCreateResult<TableMap[T]>> {
+  return apiPost<BatchCreateResult<TableMap[T]>>('batch_create', { table, items })
+}
+
 // ====== helpers por tabela ===================================================
 
 function makeTableApi<T extends TableName>(table: T) {

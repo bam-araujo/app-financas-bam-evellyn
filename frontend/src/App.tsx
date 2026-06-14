@@ -6,6 +6,7 @@ import { useHashRoute } from './hooks/useHashRoute'
 import { currentCompetencia } from './lib/competencia'
 import { AcertoPage } from './pages/Acerto'
 import { DespesasPage } from './pages/Despesas'
+import { ImportarPage } from './pages/Importar'
 import { ReceitasPage } from './pages/Receitas'
 
 type ConnStatus =
@@ -17,6 +18,7 @@ const TABS = [
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
   { key: 'acerto', label: 'Acerto' },
+  { key: 'importar', label: 'Importar' },
 ]
 
 export default function App() {
@@ -48,7 +50,8 @@ export default function App() {
         {route === 'despesas' && <DespesasPage competencia={competencia} />}
         {route === 'receitas' && <ReceitasPage competencia={competencia} />}
         {route === 'acerto' && <AcertoPage competencia={competencia} />}
-        {route !== 'despesas' && route !== 'receitas' && route !== 'acerto' && (
+        {route === 'importar' && <ImportarPage />}
+        {!['despesas', 'receitas', 'acerto', 'importar'].includes(route) && (
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
