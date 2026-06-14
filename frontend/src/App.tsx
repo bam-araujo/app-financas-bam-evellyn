@@ -5,6 +5,7 @@ import { Tabs } from './components/Tabs'
 import { useHashRoute } from './hooks/useHashRoute'
 import { currentCompetencia } from './lib/competencia'
 import { AcertoPage } from './pages/Acerto'
+import { DashboardPage } from './pages/Dashboard'
 import { DespesasPage } from './pages/Despesas'
 import { ImportarPage } from './pages/Importar'
 import { ReceitasPage } from './pages/Receitas'
@@ -18,6 +19,7 @@ const TABS = [
   { key: 'despesas', label: 'Despesas' },
   { key: 'receitas', label: 'Receitas' },
   { key: 'acerto', label: 'Acerto' },
+  { key: 'dashboard', label: 'Dashboard' },
 ]
 
 export default function App() {
@@ -49,8 +51,9 @@ export default function App() {
         {route === 'despesas' && <DespesasPage competencia={competencia} />}
         {route === 'receitas' && <ReceitasPage competencia={competencia} />}
         {route === 'acerto' && <AcertoPage competencia={competencia} />}
+        {route === 'dashboard' && <DashboardPage competencia={competencia} />}
         {route === 'importar' && <ImportarPage />}
-        {!['despesas', 'receitas', 'acerto', 'importar'].includes(route) && (
+        {!['despesas', 'receitas', 'acerto', 'dashboard', 'importar'].includes(route) && (
           <p className="muted">Página desconhecida.</p>
         )}
       </main>
