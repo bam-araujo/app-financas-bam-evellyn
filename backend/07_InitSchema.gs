@@ -1,6 +1,7 @@
 /**
- * Setup inicial (one-shot pelo editor). Cria as 7 abas com cabeçalho,
- * popula `pessoas` (Bam, Evellyn) e categorias iniciais. Idempotente.
+ * Setup inicial (one-shot pelo editor). Cria todas as abas do SCHEMA com
+ * cabeçalho, popula `pessoas` (Bam, Evellyn) e categorias iniciais.
+ * Idempotente — pode ser re-rodado sem duplicar.
  *
  * Rodar pela UI do Apps Script: dropdown → initSchema → Executar.
  */
@@ -31,6 +32,7 @@ function initSchema() {
       { nome: 'Serviços', grupo: 'despesa' },
       { nome: 'Compras', grupo: 'despesa' },
       { nome: 'Reformas', grupo: 'despesa' },
+      { nome: 'Pets', grupo: 'despesa' },
       { nome: 'Outros', grupo: 'despesa' },
       { nome: 'Salário', grupo: 'receita' },
       { nome: 'Bônus', grupo: 'receita' },
