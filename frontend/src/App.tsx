@@ -1,52 +1,67 @@
 import { useEffect, useState } from 'react'
 import { ping } from './api/client'
+import { CompetenciaSelector } from './components/CompetenciaSelector'
+import { Tabs } from './components/Tabs'
+import { useHashRoute } from './hooks/useHashRoute'
+import { currentCompetencia } from './lib/competencia'
+import { DespesasPage } from './pages/Despesas'
+import { ReceitasPage } from './pages/Receitas'
 
-type Status =
+type ConnStatus =
   | { kind: 'loading' }
-  | { kind: 'ok'; ts: number }
+  | { kind: 'ok' }
   | { kind: 'error'; message: string }
 
+const TABS = [
+  { key: 'despesas', label: 'Despesas' },
+  { key: 'receitas', label: 'Receitas' },
+]
+
 export default function App() {
-  const [status, setStatus] = useState<Status>({ kind: 'loading' })
+  const [conn, setConn] = useState<ConnStatus>({ kind: 'loading' })
+  const [competencia, setCompetencia] = useState<string>(currentCompetencia())
+  const [route, navigate] = useHashRoute('despesas')
 
   useEffect(() => {
     ping()
-      .then((data) => setStatus({ kind: 'ok', ts: data.ts }))
-      .catch((err: Error) => setStatus({ kind: 'error', message: err.message }))
+      .then(() => setConn({ kind: 'ok' }))
+      .catch((err: Error) => setConn({ kind: 'error', message: err.message }))
   }, [])
 
   return (
-    <main>
-      <h1>Finanças — Bam &amp; Evellyn</h1>
-      <p>Status da conexão com a API:</p>
-      <StatusBadge status={status} />
-      <hr style={{ margin: '2rem 0', border: 0, borderTop: '1px solid #e5e7eb' }} />
-      <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-        PR1 — fundação. As telas reais (lançamentos, rateio, dashboards, investimentos) virão nos PRs seguintes.
-      </p>
-    </main>
+    <>
+      <header className="app-header">
+        <div className="app-header-row">
+          <h1>Finanças</h1>
+          <ConnDot status={conn} />
+        </div>
+        <CompetenciaSelector value={competencia} onChange={setCompetencia} />
+        <Tabs tabs={TABS} current={route} onChange={navigate} />
+      </header>
+
+      <main>
+        {conn.kind === 'error' && (
+          <p className="error-msg">Sem conexão com a API: {conn.message}</p>
+        )}
+        {route === 'despesas' && <DespesasPage competencia={competencia} />}
+        {route === 'receitas' && <ReceitasPage competencia={competencia} />}
+        {route !== 'despesas' && route !== 'receitas' && (
+          <p className="muted">Página desconhecida.</p>
+        )}
+      </main>
+    </>
   )
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  if (status.kind === 'loading') {
-    return (
-      <span className="status load">
-        <span className="dot" /> Verificando…
-      </span>
-    )
-  }
-  if (status.kind === 'ok') {
-    const when = new Date(status.ts).toLocaleString('pt-BR')
-    return (
-      <span className="status ok" title={`servidor: ${when}`}>
-        <span className="dot" /> Conectado
-      </span>
-    )
-  }
+function ConnDot({ status }: { status: ConnStatus }) {
+  const cls = status.kind === 'ok' ? 'ok' : status.kind === 'error' ? 'err' : 'load'
+  const title =
+    status.kind === 'ok' ? 'Conectado' :
+    status.kind === 'error' ? `Erro: ${status.message}` :
+    'Verificando conexão…'
   return (
-    <span className="status err" title={status.message}>
-      <span className="dot" /> Erro: {status.message}
+    <span className={`status ${cls}`} title={title} aria-label={title}>
+      <span className="dot" />
     </span>
   )
 }
