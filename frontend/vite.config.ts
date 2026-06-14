@@ -31,6 +31,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico}'],
+        // SW novo assume controle imediatamente em vez de ficar em "waiting"
+        // até todas as abas fecharem. Combinado com o listener de
+        // controllerchange em main.tsx, faz com que uma nova versão em prod
+        // apareça já na primeira abertura (1 reload silencioso), em vez de
+        // exigir 2-3 ciclos abrir/fechar do PWA.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
