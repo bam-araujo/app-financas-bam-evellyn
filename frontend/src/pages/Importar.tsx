@@ -416,90 +416,103 @@ export function ImportarPage({ me }: Props) {
                     </p>
                   )}
                   <div className="import-line">
-                    <input
-                      type="date"
-                      value={l.data}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { data: e.target.value } })}
-                    />
-                    <input
-                      type="text"
-                      value={l.descricao}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { descricao: e.target.value } })}
-                      className="grow"
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={l.valor_input}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { valor_input: e.target.value } })}
-                      className="valor"
-                      title="Valor (editável)"
-                    />
+                    <ImportField label="Data">
+                      <input
+                        type="date"
+                        value={l.data}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { data: e.target.value } })}
+                      />
+                    </ImportField>
+                    <ImportField label="Descrição" grow>
+                      <input
+                        type="text"
+                        value={l.descricao}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { descricao: e.target.value } })}
+                        className="grow"
+                      />
+                    </ImportField>
+                    <ImportField label="Valor">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={l.valor_input}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { valor_input: e.target.value } })}
+                        className="valor"
+                      />
+                    </ImportField>
                   </div>
                   <div className="import-line">
-                    <select
-                      value={l.categoria}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { categoria: e.target.value } })}
-                    >
-                      <option value="">— categoria —</option>
-                      {despesaCats.map((c) => (
-                        <option key={c.id} value={c.nome}>{c.nome}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={l.tipo}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { tipo: e.target.value as 'individual' | 'conjunto', dono: '' } })}
-                    >
-                      <option value="conjunto">Conjunta</option>
-                      <option value="individual">Individual</option>
-                    </select>
-                    <select
-                      value={l.pagador}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { pagador: e.target.value as Pessoa } })}
-                      title="Pagador"
-                    >
-                      <option value="Bam">Bam</option>
-                      <option value="Evellyn">Evellyn</option>
-                    </select>
-                    {l.tipo === 'individual' && (
+                    <ImportField label="Categoria">
                       <select
-                        value={l.dono}
-                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { dono: e.target.value as Pessoa } })}
-                        title="Dono"
+                        value={l.categoria}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { categoria: e.target.value } })}
                       >
-                        <option value="">— dono —</option>
+                        <option value="">— escolher —</option>
+                        {despesaCats.map((c) => (
+                          <option key={c.id} value={c.nome}>{c.nome}</option>
+                        ))}
+                      </select>
+                    </ImportField>
+                    <ImportField label="Tipo">
+                      <select
+                        value={l.tipo}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { tipo: e.target.value as 'individual' | 'conjunto', dono: '' } })}
+                      >
+                        <option value="conjunto">Conjunta</option>
+                        <option value="individual">Individual</option>
+                      </select>
+                    </ImportField>
+                    <ImportField label="Pagador (quem pagou)">
+                      <select
+                        value={l.pagador}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { pagador: e.target.value as Pessoa } })}
+                      >
                         <option value="Bam">Bam</option>
                         <option value="Evellyn">Evellyn</option>
                       </select>
+                    </ImportField>
+                    {l.tipo === 'individual' && (
+                      <ImportField label="Dono (de quem é)">
+                        <select
+                          value={l.dono}
+                          onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { dono: e.target.value as Pessoa } })}
+                        >
+                          <option value="">— escolher —</option>
+                          <option value="Bam">Bam</option>
+                          <option value="Evellyn">Evellyn</option>
+                        </select>
+                      </ImportField>
                     )}
                   </div>
                   <div className="import-line">
-                    <select
-                      value={l.repeticao}
-                      onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { repeticao: e.target.value as 'unico' | 'parcelado' | 'recorrente' } })}
-                      title="Repetição"
-                    >
-                      <option value="unico">Único</option>
-                      <option value="parcelado">Parcelado</option>
-                      <option value="recorrente">Recorrente</option>
-                    </select>
+                    <ImportField label="Repetição">
+                      <select
+                        value={l.repeticao}
+                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { repeticao: e.target.value as 'unico' | 'parcelado' | 'recorrente' } })}
+                      >
+                        <option value="unico">Único</option>
+                        <option value="parcelado">Parcelado</option>
+                        <option value="recorrente">Recorrente</option>
+                      </select>
+                    </ImportField>
                     {l.repeticao === 'parcelado' && (
-                      <input
-                        type="number"
-                        min={2}
-                        max={60}
-                        value={l.parcelas}
-                        onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) } })}
-                        title="Nº de parcelas (cria N linhas mensais a partir desta data)"
-                        className="parcelas"
-                      />
+                      <ImportField label="Nº de parcelas">
+                        <input
+                          type="number"
+                          min={2}
+                          max={60}
+                          value={l.parcelas}
+                          onChange={(e) => dispatch({ type: 'UPDATE_LINE', index: i, patch: { parcelas: Math.max(2, Math.min(60, Number(e.target.value) || 2)) } })}
+                          className="parcelas"
+                        />
+                      </ImportField>
                     )}
                     {l.repeticao === 'recorrente' && (
-                      <span className="muted-light" style={{ fontSize: '0.75rem' }}>24 meses</span>
+                      <span className="muted-light" style={{ fontSize: '0.75rem', alignSelf: 'flex-end', paddingBottom: '0.45rem' }}>24 meses</span>
                     )}
                     {l.parser_parcela_num && l.parser_parcela_total && (
-                      <span className="muted-light" style={{ fontSize: '0.75rem' }}>
+                      <span className="muted-light" style={{ fontSize: '0.75rem', alignSelf: 'flex-end', paddingBottom: '0.45rem' }}>
                         parser detectou {l.parser_parcela_num}/{l.parser_parcela_total}
                       </span>
                     )}
@@ -525,5 +538,26 @@ export function ImportarPage({ me }: Props) {
         </>
       )}
     </section>
+  )
+}
+
+/** Wrapper de campo no review da tela de Importar — label pequena em cima
+ *  do input/select pra distinguir visualmente Pagador vs Dono (ambos
+ *  mostram "Bam"/"Evellyn" no select). Usa flex vertical pra não bagunçar
+ *  o layout horizontal do `.import-line`. */
+function ImportField({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
+  return (
+    <label style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '2px',
+      flex: grow ? '1 1 12rem' : '0 0 auto',
+      minWidth: 0,
+    }}>
+      <span style={{ fontSize: '0.7rem', color: 'var(--muted)', lineHeight: 1, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+        {label}
+      </span>
+      {children}
+    </label>
   )
 }
