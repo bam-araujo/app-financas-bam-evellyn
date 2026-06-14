@@ -38,8 +38,11 @@ export const BANKS: Record<Bank, BankInfo> = {
   itau: {
     id: 'itau',
     label: 'Itaú',
+    // Termos exclusivos do Itaú. "fatura do seu cartão" sozinho era falso
+    // positivo pra MP, que usa "Parcele a fatura do seu Cartão de Crédito
+    // Mercado Pago" — tirei.
     detect: (lines) =>
-      lines.some((l) => /ita[uú]card|fatura\s+do\s+seu\s+cart[ãa]o|banco\s+ita[uú]/i.test(l.text)),
+      lines.some((l) => /ita[uú]card|banco\s+ita[uú]|ita[uú]\s+unibanco/i.test(l.text)),
     parse: parseItauFatura,
   },
   nubank: {
