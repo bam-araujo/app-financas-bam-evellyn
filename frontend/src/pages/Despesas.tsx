@@ -9,12 +9,12 @@ import {
   type WhoamiData,
 } from '../api/client'
 import type { LancamentoRow, Pessoa, ShareData } from '../api/types'
-import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EntityList } from '../components/EntityList'
 import type { GlobalFilters } from '../components/Filters'
 import { useAutoCategorias } from '../hooks/useAutoCategorias'
 import { useCategorias } from '../hooks/useCategorias'
 import { useCrudForm } from '../hooks/useCrudForm'
+import { useDialog } from '../hooks/useDialog'
 import { competenciaFromDate, todayISO } from '../lib/competencia'
 import { formatBRL, formatCompetenciaBR, formatDateBR, parseBRL } from '../lib/format'
 import { lancamentoWeight } from '../lib/rateio'
@@ -62,30 +62,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
   // Dialog imperativo: openDialog devolve Promise que resolve com a opção
   // escolhida (ou null se fechou via overlay/Esc). Usado pra perguntar
   // scope quando o usuário edita/exclui linha de série.
-  type DialogChoice<T> = { label: string; value: T; primary?: boolean; danger?: boolean }
-  interface DialogState {
-    title: string
-    message?: React.ReactNode
-    options: { label: string; onClick: () => void; primary?: boolean; danger?: boolean }[]
-    onClose: () => void
-  }
-  const [dialogState, setDialogState] = useState<DialogState | null>(null)
-  function openDialog<T>(config: { title: string; message?: React.ReactNode; choices: DialogChoice<T>[] }): Promise<T | null> {
-    return new Promise((resolve) => {
-      const close = () => { setDialogState(null); resolve(null) }
-      setDialogState({
-        title: config.title,
-        message: config.message,
-        options: config.choices.map((c) => ({
-          label: c.label,
-          primary: c.primary,
-          danger: c.danger,
-          onClick: () => { setDialogState(null); resolve(c.value) },
-        })),
-        onClose: close,
-      })
-    })
-  }
+  const { dialog, openDialog } = useDialog()
 
   function fetchList() {
     setLoading(true)
@@ -405,13 +382,7 @@ export function DespesasPage({ competencia, filters, me }: Props) {
         )}
       />
 
-      <ConfirmDialog
-        open={!!dialogState}
-        title={dialogState?.title || ''}
-        message={dialogState?.message}
-        options={dialogState?.options || []}
-        onClose={() => dialogState?.onClose()}
-      />
+      {dialog}
     </section>
   )
 
