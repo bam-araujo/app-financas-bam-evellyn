@@ -30,7 +30,15 @@ const RE_VALOR_END = /R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/
 const RE_PARCELA = /\bParcela\s+(\d+)\s+de\s+(\d+)\b/i
 const RE_VENCIMENTO_TOP = /Vence em\s*(\d{2})\/(\d{2})\/(\d{4})/i
 const RE_VENCIMENTO_HEADER = /Vencimento:\s*(\d{2})\/(\d{2})\/(\d{4})/i
-const RE_TOTAL = /Total a pagar\s*R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i
+// "Total a pagar" no header da pág 1 aparece em linha separada do valor
+// (label num Y, valor noutro Y) — pdfjs não junta. Fallback: pega a linha
+// do "Resumo da fatura" da pág 1 onde "Total" e o valor ficam juntos.
+// Match estrito (`^Total\s+R\$`) evita falso positivo em "Total da fatura
+// de abril R$ 521,17" e "Total R$ 15,72" (lançamentos futuros, pág 5).
+// O primeiro match vence (extractMeta tem `if (!total)`), e a linha correta
+// na pág 1 é processada antes das outras.
+const RE_TOTAL_INLINE = /Total a pagar\s+R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i
+const RE_TOTAL_RESUMO = /^Total\s+R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/i
 const RE_TITULAR = /Olá,\s*(.+?)\s*$/i
 
 const TERMINATORS = [
@@ -70,7 +78,7 @@ function extractMeta(lines: LineInput[]): FaturaMeta {
       if (m) vencimento = `${m[3]}-${m[2]}-${m[1]}`
     }
     if (!total) {
-      const m = t.match(RE_TOTAL)
+      const m = t.match(RE_TOTAL_INLINE) || t.match(RE_TOTAL_RESUMO)
       if (m) {
         const v = parseValorBR(m[1])
         if (isFinite(v)) total = v
