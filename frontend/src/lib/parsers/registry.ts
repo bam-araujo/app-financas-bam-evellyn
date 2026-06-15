@@ -16,10 +16,9 @@
 import { parseItauFatura } from './itau-fatura'
 import { parseMercadoPagoFatura } from './mercadopago-fatura'
 import { parseNubankFatura } from './nubank-fatura'
-import { parseSantanderFatura } from './santander-fatura'
 import type { LineInput, ParsedFatura } from './types'
 
-export type Bank = 'itau' | 'nubank' | 'santander' | 'mercadopago'
+export type Bank = 'itau' | 'nubank' | 'mercadopago'
 export type BankSelection = 'auto' | Bank
 
 export interface BankInfo {
@@ -52,13 +51,6 @@ export const BANKS: Record<Bank, BankInfo> = {
       lines.some((l) => /\bnubank\b|nu\s+pagamentos|nupay/i.test(l.text)),
     parse: parseNubankFatura,
   },
-  santander: {
-    id: 'santander',
-    label: 'Santander',
-    detect: (lines) => lines.some((l) => /\bsantander\b/i.test(l.text)),
-    parse: parseSantanderFatura,
-    pending: true,
-  },
   mercadopago: {
     id: 'mercadopago',
     label: 'Mercado Pago',
@@ -69,7 +61,7 @@ export const BANKS: Record<Bank, BankInfo> = {
 }
 
 /** Lista pra UI (dropdown). Ordem fixa: Itaú primeiro (default). */
-export const BANK_ORDER: Bank[] = ['itau', 'nubank', 'santander', 'mercadopago']
+export const BANK_ORDER: Bank[] = ['itau', 'nubank', 'mercadopago']
 
 /** Tenta detectar o emissor pela 1ª assinatura que bate. Devolve null se
  *  nenhuma bater — UI sugere o usuário escolher manualmente. */
