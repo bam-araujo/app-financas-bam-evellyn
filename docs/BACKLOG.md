@@ -300,9 +300,26 @@ Anexar um arquivo PDF (nota fiscal) a um lançamento. Útil pra deduções (méd
 Decisões registradas em 2026-06-14:
 
 - ❌ **Resumo semanal por email** — fora de escopo, casal prefere acessar app.
-- ❌ **Outros bancos no import** (Nubank, Inter, etc.) — Itaú cobre 100% hoje.
 - ❌ **Foto de comprovante** — anexar arquivo é suficiente quando relevante.
 - ❌ **Relatório IRPF** — exportar CSV (C-export) cobre o caso quando precisar.
 - ❌ **Cotação automática de ativos** — entrada manual está OK.
 - ❌ **Multi-moeda** — gastos em moeda estrangeira são raros.
 - ❌ **Carteira ideal vs atual** — alocação alvo não é decisão do app.
+
+Decisões registradas em 2026-06-15:
+
+- ❌ **A7 — Saldo de conta corrente** (detalhe em A7 acima).
+- ❌ **A8 — Tracker de dívidas separado** (detalhe em A8 acima).
+- ❌ **Parser Santander** — conta cancelada, não vai usar.
+
+## Refator findings — auditoria 2026-06-15
+
+Pontos vistos durante revisão de fim-de-sessão que NÃO foram tocados (risco > ganho ou caso não-frequente). Ficam aqui pra retomar se virar dor real:
+
+- **Parser MP não trata multi-linha**: assume valor inline. Se MP no futuro mudar layout pra internacional com conversão em linha separada (como o Nubank), parser perde a tx. Hoje o sample não tem esse caso; adicionar tratamento "valor-only line" só quando aparecer.
+- **`Pagamento em` skip do parser Nubank**: a regex `/^Pagamento em\b/i` em [nubank-fatura.ts:154](app-financas-bam-evellyn/frontend/src/lib/parsers/nubank-fatura.ts) pula a descrição. Falso positivo se uma descrição real começar com "Pagamento em" — improvável mas teórico.
+- **`titular` match em MP via `raw.includes(meta.titular)`**: se titular for "Evellyn" (short) e uma compra tiver "Evellyn" no nome, a linha é pulada. Não acontece com nomes longos completos; só observar se aparecer.
+- **`useCashflowProjection` assume share constante**: o share usado pra ratear conjuntas no futuro é o do mês corrente. Se a renda do casal mudar bruscamente (alguém perde emprego), a projeção fica desatualizada até o user reabrir o mês. Documentado no rodapé do card.
+- **`ImportField` inline em Importar.tsx**: só usado lá, não vale extrair pra `/components` ainda — se virar pattern em outra página, extrair.
+- **`autoCat.suggest` chamado a cada keystroke no form de despesa**: já é função em memória, custo desprezível. Não otimizar.
+- **`Dashboard.tsx` faz progressive load (lists rápido, shares em background)**: já otimizado em `96bccf9` (20s → 5s). Sem ganho marginal previsto.

@@ -110,6 +110,7 @@ frontend/
       useCashflowProjection.ts    # cálculo puro da projeção 6m (entradas/saídas/saldo)
       useCategorias.ts
       useCrudForm.ts              # ◆ form genérico (open/save/edit/close)
+      useDialog.tsx               # ◆ ConfirmDialog Promise-based (esta/futuras/cancelar)
       useHashRoute.ts
       useInvestimentoInsights.ts  # cálculos puros dos 12 meses
       useTheme.ts
@@ -219,27 +220,29 @@ E o form vira função local `renderForm()` chamada de 2 lugares: top da página
 
 Variante com card+título: `InvestRowList` (usar quando precisar do wrapper de card + count, ex.: Investimentos).
 
-### `ConfirmDialog` ([components/ConfirmDialog.tsx](frontend/src/components/ConfirmDialog.tsx))
+### `useDialog` ([hooks/useDialog.tsx](frontend/src/hooks/useDialog.tsx))
 
-Modal genérico com N opções, perfeito pra escolhas tripartites tipo "esta linha / esta + futuras / cancelar". Mais flexível que `window.confirm()` que é binário.
-
-Helper Promise-based recomendado (em uso em Despesas):
+Hook que envelopa o [ConfirmDialog](frontend/src/components/ConfirmDialog.tsx) em API Promise-based. Resolve a dor do `window.confirm()` binário pra escolhas tripartites tipo "esta linha / esta + futuras / cancelar".
 
 ```tsx
-function openDialog<T>(config: { title, message?, choices: {label, value: T, primary?, danger?}[] }): Promise<T | null> {
-  return new Promise((resolve) => {
-    setDialogState({
-      title, message,
-      options: config.choices.map((c) => ({ ...c, onClick: () => { setDialogState(null); resolve(c.value) } })),
-      onClose: () => { setDialogState(null); resolve(null) },  // Esc / overlay → null = cancel
-    })
-  })
-}
+const { dialog, openDialog } = useDialog()
 
 // uso:
-const scope = await openDialog<'this' | 'forward'>({ ... })
-if (scope === null) throw new Error('cancelado')
+const scope = await openDialog<'this' | 'forward'>({
+  title: 'Aplicar a quais lançamentos?',
+  message: <>Esta é parcela 3/12...</>,
+  choices: [
+    { label: 'Esta + futuras', value: 'forward', primary: true },
+    { label: 'Só esta', value: 'this' },
+  ],
+})
+if (scope === null) throw new Error('cancelado')  // Esc/overlay fechou
+// ...
+
+return (<>{...UI...} {dialog}</>)  // renderizar uma vez na page tree
 ```
+
+Em uso em Despesas e Receitas. **Não recriar** o wrapper Promise-based em páginas novas — sempre via este hook.
 
 ### `useReducer` ([pages/importarReducer.ts](frontend/src/pages/importarReducer.ts))
 
@@ -430,3 +433,7 @@ Roadmap de produto priorizado vive em [docs/BACKLOG.md](docs/BACKLOG.md). Tiers 
 - **PWA atualiza em 1 ciclo (b81b34a):** workbox skipWaiting+clientsClaim + reload silencioso via `controllerchange` em main.tsx. Antes exigia abrir/fechar 2-3 vezes pra ver build novo.
 - **HTTP cache bypass (ae0bc47):** api/client.ts passa `cache: 'no-store'` em todo fetch. Sem isso, Chrome reusava GET por heurística e telas mostravam dado stale após updates.
 - **A6 — Previsão de caixa 6m (d1a531c):** card novo no Dashboard com LineChart + tabela. Hook puro `useCashflowProjection`. Saldo inicial em localStorage por pessoa. Toggle Conta/Patrimônio total. Investimentos somados nominalmente por titular.
+- **Parsers Nubank e MP (a3bf314, c710cf9, 3a22fd0):** registry banco-agnóstico em [parsers/registry.ts](frontend/src/lib/parsers/registry.ts) com auto-detect. UI ganha dropdown "Banco" em Importar. Calibrado com PDFs reais em `samples/` (gitignored).
+- **Polish operacional 2026-06-15 (b81b34a, ae0bc47, bd6dee8, 3a00a13, 0026552, ed8aaf5):** PWA atualiza em 1 ciclo (skipWaiting+reload), HTTP `cache: 'no-store'` resolve dado stale, labels no review do Importar, prefill pagador/dono via titular da fatura, contagem de extras separada da fatura atual, hook `useDialog` extraído de Despesas/Receitas.
+- **A7 e A8 fora de escopo (2026-06-15):** decisão explícita do usuário — app rastreia fluxo + patrimônio aplicado, não saldo de conta corrente nem dívidas separadas. Ver [BACKLOG.md](docs/BACKLOG.md). NÃO ressuscitar sem pedido.
+- **Resumo desta sessão:** [docs/CHANGELOG-2026-06-14-15.md](docs/CHANGELOG-2026-06-14-15.md) — TL;DR + pontos não-óbvios pro próximo agente.

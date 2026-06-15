@@ -23,6 +23,7 @@ docs/       # SETUP.md (zero-to-prod) e QA-REPORT.md (histórico)
 ## Para começar
 
 - **Quer entender o projeto antes de mexer em qualquer coisa?** [AGENTS.md](AGENTS.md) — onboarding completo: regras, arquitetura, padrões, cookbook, armadilhas.
+- **O que mudou recentemente?** [docs/CHANGELOG-2026-06-14-15.md](docs/CHANGELOG-2026-06-14-15.md) — TL;DR da última sessão grande de mudanças.
 - **Subir do zero (setup manual no Google Cloud + Apps Script + Pages)?** [docs/SETUP.md](docs/SETUP.md).
 - **Roadmap de produto (backlog priorizado)?** [docs/BACKLOG.md](docs/BACKLOG.md).
 - **Histórico dos 7 PRs originais?** [PRs-app-financas.md](PRs-app-financas.md).
