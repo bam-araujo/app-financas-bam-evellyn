@@ -156,21 +156,13 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ---
 
-### A8. ⬜ Passivos (dívidas)
+### A8. ❌ Passivos (dívidas) — FORA DE ESCOPO (2026-06-15)
 
-**Esforço:** 2d
+**Decisão do usuário:** financiamentos e outras dívidas já são cadastrados como **despesas parceladas em Despesas** (com `parcela_total` e categoria `Financiamentos`). Cada parcela "se paga" naturalmente quando o mês entra. A6 (previsão de caixa) já mostra esses comprometimentos somados nas saídas mensais futuras. Tracker separado seria trabalho duplicado — manteria 2 sistemas pra mesma informação.
 
-**Por que vale:** financiamento de carro, empréstimo, parcelado de longo prazo não estão modelados. Patrimônio líquido (ativos − passivos) fica incompleto.
+**Considerada e descartada — variante v2** (card "Patrimônio líquido" no Dashboard agrupando lancamentos com `categoria=Financiamentos` e `data >= hoje` por `serie_id`, com barra de progresso e investimentos − financiamentos = líquido). Não trouxe ganho prático que justificasse o esforço — a info já está visível no gráfico de projeção do A6.
 
-**Critério de aceite:**
-- Nova tabela `dividas(id, titular, descricao, total, juros_mes, parcelas_total, parcelas_pagas, inicio)`.
-- Página `/dividas` com CRUD.
-- Card no Dashboard: "Patrimônio líquido = investimentos − dívidas" (contas correntes ficaram fora de escopo, ver A7).
-- Visão de "% pago" por dívida.
-
-**Dicas de implementação:**
-- Padrão CRUD (`useCrudForm + EntityList` + `makeTableApi`).
-- Cuidado: dívidas têm relação com lançamentos (a parcela paga é um lançamento) — modelar como "lançamento referencia divida_id"? Ou simplificar e tratar como tracker independente? Por simplicidade, começar independente.
+**NÃO propor essa ideia novamente.** Se aparecer necessidade futura ("preciso ver patrimônio líquido"), o usuário avisa explicitamente.
 
 ---
 
