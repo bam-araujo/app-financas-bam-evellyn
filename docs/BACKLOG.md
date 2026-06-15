@@ -142,24 +142,17 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 - `frontend/src/components/charts/PrevisaoCaixa.tsx`
 - `Dashboard.tsx` busca `investimentosSaldos` e calcula `saldoInvestimentosFiltrado` nominal.
 
-**Próximo refinamento natural:** quando A7 (contas correntes) for entregue, substituir o input manual de saldo inicial pela soma das contas.
+**Refinamento descartado:** A7 (contas correntes) foi rejeitado em 2026-06-15 — usuário não quer rastrear saldo de conta corrente. Saldo inicial manual no card continua sendo a única opção (e é opcional — pode usar com R$ 0 pra ver só a trajetória de fluxo acumulado).
 
 ---
 
-### A7. ⬜ Contas correntes / saldo em conta
+### A7. ❌ Contas correntes / saldo em conta — FORA DE ESCOPO (2026-06-15)
 
-**Esforço:** 2d
+**Decisão do usuário:** o app rastreia *fluxo* (receitas/despesas) e *patrimônio aplicado* (investimentos). Saldo de conta corrente é buffer operacional que não faz parte do que importa medir — não é "guardado", é só dinheiro de passagem.
 
-**Por que vale:** investimentos têm saldo, mas conta corrente / poupança / dinheiro vivo não entram no app. Bloqueia ter visão de "quanto vocês têm hoje".
+**Implicação pra A6:** o input manual de "saldo em conta hoje" continua, mas é opcional — usuário pode deixar em R$ 0 e usar a projeção como visualização de **fluxo acumulado** (trajetória) em vez de saldo absoluto.
 
-**Critério de aceite:**
-- Nova tabela `contas(id, titular, banco, tipo, saldo, atualizado_em)`.
-- Página `/contas` com CRUD simples (similar a Investimentos).
-- Saldo total = Σ saldos das contas + Σ saldos de investimentos. Card no Dashboard.
-
-**Dicas de implementação:**
-- Schema + `useCrudForm + EntityList` (padrão estabelecido).
-- "atualizado_em" pra mostrar se o saldo está velho.
+**NÃO propor essa ideia novamente.** Se aparecer necessidade futura ("preciso saber quanto tenho em conta hoje"), o usuário avisa explicitamente.
 
 ---
 
@@ -172,11 +165,11 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 **Critério de aceite:**
 - Nova tabela `dividas(id, titular, descricao, total, juros_mes, parcelas_total, parcelas_pagas, inicio)`.
 - Página `/dividas` com CRUD.
-- Card no Dashboard: "Patrimônio líquido = ativos (contas + investimentos) − dívidas".
+- Card no Dashboard: "Patrimônio líquido = investimentos − dívidas" (contas correntes ficaram fora de escopo, ver A7).
 - Visão de "% pago" por dívida.
 
 **Dicas de implementação:**
-- Similar a A7, padrão CRUD.
+- Padrão CRUD (`useCrudForm + EntityList` + `makeTableApi`).
 - Cuidado: dívidas têm relação com lançamentos (a parcela paga é um lançamento) — modelar como "lançamento referencia divida_id"? Ou simplificar e tratar como tracker independente? Por simplicidade, começar independente.
 
 ---
