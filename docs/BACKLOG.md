@@ -207,7 +207,23 @@ Itens de produto priorizados em tiers (S = mais alto). Cada item tem **estimativ
 
 ## Tier B — Médio valor (quando o app tiver mais maturidade)
 
-### B13. ⬜ Sub-categorias / tags transversais
+### B-dedup. ⬜ Refinar dedup do import — incluir descrição
+
+**Esforço:** 0.5d
+
+**Por que vale:** dedup atual usa só `data+valor`. Marca como duplicada qualquer compra do mesmo dia com o mesmo valor — falso positivo comum (ex: dois gastos de R$ 50 no mesmo dia em lojas diferentes). Usuário pediu pra apertar a regra incluindo a descrição.
+
+**Critério de aceite:**
+- Linha só vem marcada como `dupe` quando bate `data + valor + descrição` (todos iguais ao lançamento existente).
+- Comparação de descrição: normalizada (lowercase + trim + colapsa espaços). Sem fuzzy match.
+- Comportamento UI da `dupe`: continua igual (desmarca selected, badge no review).
+
+**Trade-off conhecido (documentar no código):** a regra original aceitava falso positivo pra evitar falso negativo quando o usuário renomeia a descrição (ex: `PG*POSTOOSCAR` → `Posto`). Com a regra nova, se você renomeou no banco e a próxima fatura traz o nome bruto do parser, NÃO vai mais detectar como duplicada — vai criar de novo. Como mitigação, **se editar descrição, edite ANTES de importar a próxima fatura** ou aceite revisar manualmente as duplicatas.
+
+**Dicas de implementação:**
+- Ajustar `dupeKey()` em [Importar.tsx](../frontend/src/pages/Importar.tsx) — atualmente `${data}|${valor.toFixed(2)}`. Vira `${data}|${valor.toFixed(2)}|${descricao.toLowerCase().trim().replace(/\s+/g, ' ')}`.
+- Atualizar comentário do dedup no mesmo arquivo + armadilha do AGENTS.md.
+- Como o dedup é puro-cliente sobre data já presente em `lancamentos.list({competencia})`, nenhuma mudança de backend.
 
 **Esforço:** 1–2d
 
